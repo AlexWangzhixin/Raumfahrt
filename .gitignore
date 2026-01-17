@@ -1,0 +1,40 @@
+# 排除大型数据文件
+*.tiff
+*.tif
+*.pdf
+*.docx
+*.doc
+*.mp4
+
+# 排除实验数据和结果
+*.csv
+*.png
+*.jpg
+*.jpeg
+
+# 排除编译文件
+__pycache__/
+*.pyc
+*.pyo
+
+# 排除临时文件
+~$*
+*.log
+
+# 排除操作系统文件
+.DS_Store
+Thumbs.db
+
+# 排除IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 排除虚拟环境
+venv/
+env/
+*.conda
+*.yml
+*.yaml
