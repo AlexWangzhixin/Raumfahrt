@@ -145,6 +145,13 @@ class RLTraining:
         Returns:
             初始状态
         """
+        # 重置位置
+        self.current_position = self.start_position.copy()
+        self.episode_steps = 0
+        
+        # 计算初始距离
+        initial_distance = np.linalg.norm(self.current_position - self.goal_position)
+        
         # 这里应该返回环境的初始状态
         # 暂时返回一个模拟的深度图状态
         # 形状: (height, width, channels) = (80, 64, 4)
@@ -160,12 +167,54 @@ class RLTraining:
         Returns:
             next_state, reward, done, info
         """
-        # 这里应该执行实际的环境步骤
-        # 暂时返回模拟数据
+        # 记录前一步的距离
+        prev_distance = np.linalg.norm(self.current_position - self.goal_position)
+        
+        # 模拟动作执行（根据动作更新位置）
+        # 简单的动作映射：0-8 对应不同的移动方向
+        action_mapping = [
+            (-0.1, -0.1),  # 0: 向左下移动
+            (-0.1, 0.0),   # 1: 向左移动
+            (-0.1, 0.1),   # 2: 向左上移动
+            (0.0, -0.1),   # 3: 向下移动
+            (0.0, 0.0),    # 4: 不动
+            (0.0, 0.1),    # 5: 向上移动
+            (0.1, -0.1),   # 6: 向右下移动
+            (0.1, 0.0),    # 7: 向右移动
+            (0.1, 0.1)     # 8: 向右上移动
+        ]
+        
+        # 更新位置
+        delta = action_mapping[action]
+        self.current_position[0] += delta[0]
+        self.current_position[1] += delta[1]
+        
+        # 计算新的距离
+        new_distance = np.linalg.norm(self.current_position - self.goal_position)
+        
+        # 计算奖励
+        # 奖励 = 距离减少量 - 步数惩罚
+        distance_reward = prev_distance - new_distance
+        step_penalty = 0.01
+        reward = distance_reward - step_penalty
+        
+        # 检查是否到达目标
+        done = new_distance < 0.5
+        
+        # 检查是否达到最大步数
+        self.episode_steps += 1
+        if self.episode_steps >= self.training_params.get('MAX_EPISODE_STEPS', 1000):
+            done = True
+        
+        # 生成下一个状态
         next_state = np.random.rand(80, 64, 4)
-        reward = np.random.randn()
-        done = np.random.random() < 0.1  # 10% 的概率结束
-        info = {}
+        
+        # 生成信息
+        info = {
+            'distance_to_goal': new_distance,
+            'current_position': self.current_position.tolist(),
+            'steps_taken': self.episode_steps
+        }
         
         return next_state, reward, done, info
     
