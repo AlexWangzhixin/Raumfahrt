@@ -34,6 +34,7 @@ try:
     from src.core.visualization.path_visualization import PathVisualizer
     from src.core.interfaces.planning_interface import PlanningInterface
     from src.core.perception.visual_slam import VisualSLAM
+    from src.models.environment.terramechanics import Terramechanics, ParameterEstimator
     print("成功导入所有核心模块")
 except ImportError as e:
     print(f"导入模块失败: {e}")
@@ -70,6 +71,8 @@ class LunarRoverExecution:
         self.environment_model = None
         self.dynamics_model = None
         self.dynamics_integration = None
+        self.terramechanics = None
+        self.parameter_estimator = None
         self.sensor_fusion = None
         self.path_planning_system = None
         self.visual_slam = None
@@ -224,6 +227,12 @@ class LunarRoverExecution:
         # 初始化动力学模型
         self.dynamics_model = LunarRoverDynamics()
         
+        # 初始化地面力学模型
+        self.terramechanics = Terramechanics()
+        
+        # 初始化参数估计器
+        self.parameter_estimator = ParameterEstimator()
+        
         # 初始化动力学-感知集成模块
         self.dynamics_integration = DynamicsPerceptionIntegration()
         
@@ -233,13 +242,54 @@ class LunarRoverExecution:
         
         # 测试前进运动
         print("测试前进运动...")
-        wheel_commands = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0])  # 八个车轮的控制命令
+        wheel_commands = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0])  # 六个车轮的控制命令
         
         # 执行多步仿真
         dynamics_data = []
+        terrain_interaction_data = []
+        
         for i in range(self.config['simulation_steps']):
             # 执行一步动力学仿真
             state_info = self.dynamics_model.step(wheel_commands, self.config['simulation_dt'])
+            
+            # 计算轮-壤交互
+            position = state_info['position']
+            velocity = state_info['velocity']
+            wheel_speeds = state_info['wheel_speeds']
+            
+            # 计算法向载荷（简化为总质量的1/6分配到每个车轮）
+            mass = 140.0  # 月球车质量 (kg)
+            lunar_gravity = 1.62  # 月球重力加速度 (m/s²)
+            normal_load_per_wheel = mass * lunar_gravity / 6
+            
+            # 计算沉陷量
+            sinkage = self.terramechanics.calculate_sinkage(normal_load_per_wheel)
+            
+            # 计算车轮角速度
+            wheel_radius = 0.25  # 车轮半径
+            wheel_angular_velocity = np.mean(wheel_speeds) / wheel_radius
+            
+            # 计算滑移率
+            current_velocity = np.linalg.norm(velocity[:2])
+            slip_ratio = self.terramechanics.calculate_slip_ratio(wheel_angular_velocity, current_velocity)
+            
+            # 计算滚动阻力
+            rolling_resistance = self.terramechanics.calculate_rolling_resistance(normal_load_per_wheel, slip_ratio)
+            
+            # 计算牵引力
+            tangential_load = np.linalg.norm(wheel_commands) / wheel_radius
+            traction = self.terramechanics.calculate_traction(tangential_load, slip_ratio)
+            
+            # 计算功率消耗
+            power = self.terramechanics.calculate_power_consumption(traction, current_velocity, rolling_resistance)
+            
+            # 在线估计摩擦系数
+            measured_traction = traction
+            predicted_traction = traction
+            mu_estimate = self.parameter_estimator.estimate_mu(measured_traction, predicted_traction, slip_ratio)
+            
+            # 更新地面力学模型的摩擦系数
+            self.terramechanics.update_parameters({'mu': mu_estimate})
             
             # 执行集成模块的一步
             integration_state = self.dynamics_integration.step(wheel_commands, self.config['simulation_dt'])
@@ -254,6 +304,17 @@ class LunarRoverExecution:
                 'contact_states': state_info['contact_states'],
             })
             
+            # 记录地形交互数据
+            terrain_interaction_data.append({
+                'step': i,
+                'sinkage': sinkage,
+                'slip_ratio': slip_ratio,
+                'traction': traction,
+                'rolling_resistance': rolling_resistance,
+                'power_consumption': power,
+                'mu_estimate': mu_estimate,
+            })
+            
             if (i + 1) % 10 == 0:
                 print(f"动力学仿真 {i+1}/{self.config['simulation_steps']} 完成")
         
@@ -264,6 +325,14 @@ class LunarRoverExecution:
         positions = np.array([data['position'][:2] for data in dynamics_data])
         velocities = np.array([np.linalg.norm(data['velocity']) for data in dynamics_data])
         energies = np.array([data['energy_consumed'] for data in dynamics_data])
+        
+        # 提取地形交互数据
+        sinkages = np.array([data['sinkage'] for data in terrain_interaction_data])
+        slip_ratios = np.array([data['slip_ratio'] for data in terrain_interaction_data])
+        tractions = np.array([data['traction'] for data in terrain_interaction_data])
+        rolling_resistances = np.array([data['rolling_resistance'] for data in terrain_interaction_data])
+        power_consumptions = np.array([data['power_consumption'] for data in terrain_interaction_data])
+        mu_estimates = np.array([data['mu_estimate'] for data in terrain_interaction_data])
         
         # 可视化位置轨迹
         plt.figure(figsize=(10, 8))
@@ -309,12 +378,81 @@ class LunarRoverExecution:
         plt.close()
         print(f"动力学数据可视化已保存到: {dynamics_path}")
         
+        # 可视化地面力学数据
+        plt.figure(figsize=(14, 10))
+        
+        # 沉陷量
+        plt.subplot(3, 2, 1)
+        plt.plot(range(len(sinkages)), sinkages, 'b-', linewidth=2)
+        plt.xlabel('时间步')
+        plt.ylabel('沉陷量 (m)')
+        plt.title('车轮沉陷量')
+        plt.grid(True)
+        
+        # 滑移率
+        plt.subplot(3, 2, 2)
+        plt.plot(range(len(slip_ratios)), slip_ratios, 'r-', linewidth=2)
+        plt.xlabel('时间步')
+        plt.ylabel('滑移率')
+        plt.title('车轮滑移率')
+        plt.grid(True)
+        
+        # 摩擦力估计
+        plt.subplot(3, 2, 3)
+        plt.plot(range(len(mu_estimates)), mu_estimates, 'g-', linewidth=2)
+        plt.xlabel('时间步')
+        plt.ylabel('摩擦系数')
+        plt.title('摩擦系数估计')
+        plt.grid(True)
+        
+        # 牵引力
+        plt.subplot(3, 2, 4)
+        plt.plot(range(len(tractions)), tractions, 'm-', linewidth=2)
+        plt.xlabel('时间步')
+        plt.ylabel('牵引力 (N)')
+        plt.title('车轮牵引力')
+        plt.grid(True)
+        
+        # 滚动阻力
+        plt.subplot(3, 2, 5)
+        plt.plot(range(len(rolling_resistances)), rolling_resistances, 'c-', linewidth=2)
+        plt.xlabel('时间步')
+        plt.ylabel('滚动阻力 (N)')
+        plt.title('滚动阻力')
+        plt.grid(True)
+        
+        # 功率消耗
+        plt.subplot(3, 2, 6)
+        plt.plot(range(len(power_consumptions)), power_consumptions, 'y-', linewidth=2)
+        plt.xlabel('时间步')
+        plt.ylabel('功率消耗 (W)')
+        plt.title('功率消耗')
+        plt.grid(True)
+        
+        terramechanics_path = os.path.join(self.config['dynamics_visualization_dir'], 'terramechanics_data.png')
+        plt.tight_layout()
+        plt.savefig(terramechanics_path, dpi=300, bbox_inches='tight')
+        self.results['visualization_files'].append(terramechanics_path)
+        plt.close()
+        print(f"地面力学数据可视化已保存到: {terramechanics_path}")
+        
         # 保存动力学模型结果
         self.results['dynamics_data'] = {
             'final_position': positions[-1].tolist(),
             'final_velocity': velocities[-1],
             'total_energy_consumed': energies[-1],
             'simulation_steps': self.config['simulation_steps'],
+        }
+        
+        # 保存地面力学模型结果
+        self.results['terramechanics_data'] = {
+            'average_sinkage': np.mean(sinkages),
+            'average_slip_ratio': np.mean(slip_ratios),
+            'average_traction': np.mean(tractions),
+            'average_rolling_resistance': np.mean(rolling_resistances),
+            'average_power_consumption': np.mean(power_consumptions),
+            'final_mu_estimate': mu_estimates[-1],
+            'mu_convergence': np.std(mu_estimates[-10:]) < 0.01,  # 检查摩擦系数是否收敛
         }
         
         print("动力学建模流程执行完成")
@@ -717,6 +855,13 @@ class LunarRoverExecution:
             success_steps += 1
             dyn_data = self.results['dynamics_data']
             print(f"✓ 动力学建模: 最终位置={dyn_data['final_position']}, 总能耗={dyn_data['total_energy_consumed']:.2f}J")
+        
+        # 地面力学模型结果
+        if 'terramechanics_data' in self.results:
+            total_steps += 1
+            success_steps += 1
+            ter_data = self.results['terramechanics_data']
+            print(f"✓ 地面力学建模: 平均沉陷量={ter_data['average_sinkage']:.4f}m, 平均滑移率={ter_data['average_slip_ratio']:.4f}, 最终摩擦系数={ter_data['final_mu_estimate']:.4f}, 摩擦系数收敛={ter_data['mu_convergence']}")
         
         # 感知系统结果
         if 'perception_data' in self.results:
