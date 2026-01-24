@@ -13,6 +13,12 @@ from typing import Tuple, List, Optional, Dict
 from collections import deque
 from config import config
 
+# 添加动力学模型导入
+import sys
+sys.path.append('..')
+from models.dynamics.yutu2_rover_dynamics import Yutu2RoverDynamics
+from models.dynamics.dynamics_perception_integration import DynamicsPerceptionIntegration
+
 # ==================== 中文字体配置 ====================
 import matplotlib
 matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'KaiTi', 'FangSong']
@@ -90,22 +96,18 @@ class LunarRover:
     def __init__(self, x: float = 0.5, y: float = 0.5, theta: float = 0.0):
         """
         初始化月球车
-
         Args:
             x: 初始x坐标 (m)
             y: 初始y坐标 (m)
             theta: 初始航向角 (rad)
         """
-        # 位置状态
-        self.x = x
-        self.y = y
-        self.theta = theta  # 航向角
-
-        # 速度状态
-        self.vx = 0.0  # x方向速度
-        self.vy = 0.0  # y方向速度
-        self.omega = 0.0  # 角速度
-
+        # 创建动力学模型
+        self.dynamics = Yutu2RoverDynamics()
+        self.dynamics.reset(
+            position=(x, y, 0.0),
+            orientation=(0.0, 0.0, theta)
+        )
+        
         # 物理参数
         self.mass = config.ROVER_MASS
         self.inertia = config.ROVER_INERTIA
@@ -120,29 +122,20 @@ class LunarRover:
     def reset(self, x: float = 0.5, y: float = 0.5, theta: float = 0.0):
         """
         重置月球车状态
-
         Args:
             x: 初始x坐标
             y: 初始y坐标
             theta: 初始航向角
         """
-        self.x = x
-        self.y = y
-        self.theta = theta
-        self.vx = 0.0
-        self.vy = 0.0
-        self.omega = 0.0
+        self.dynamics.reset(
+            position=(x, y, 0.0),
+            orientation=(0.0, 0.0, theta)
+        )
         self.total_energy = 0.0
 
     def step(self, velocity: float, steering_angle: float, dt: float = 0.1):
         """
         执行一个时间步的运动
-
-        运动学模型:
-        Vx = Σ(Vωi * cos(θ)) / n
-        Vy = Σ(Vωi * sin(θ)) / n
-        ω = (Vright - Vleft) / L
-
         Args:
             velocity: 目标速度 (m/s)
             steering_angle: 转向角 (rad)，正值为左转，负值为右转
@@ -150,41 +143,76 @@ class LunarRover:
         """
         # 限制速度范围
         velocity = np.clip(velocity, 0, self.max_velocity)
-
-        # 更新角速度
-        self.omega = velocity * np.tan(steering_angle) / self.wheelbase
-
-        # 更新航向角
-        self.theta += self.omega * dt
-        # 归一化到 [-π, π]
-        self.theta = np.arctan2(np.sin(self.theta), np.cos(self.theta))
-
-        # 更新速度分量
-        self.vx = velocity * np.cos(self.theta)
-        self.vy = velocity * np.sin(self.theta)
-
-        # 更新位置
-        self.x += self.vx * dt
-        self.y += self.vy * dt
-
-        # 计算能量消耗（简化模型：与速度平方成正比）
-        energy = 0.5 * self.mass * velocity ** 2 * dt
-        self.total_energy += energy
+        
+        # 根据速度和转向角计算车轮扭矩
+        # 简化的扭矩分配：左右轮不同速度实现转向
+        left_wheel_velocity = velocity * (1 - np.tan(steering_angle) * self.width / (2 * self.wheelbase))
+        right_wheel_velocity = velocity * (1 + np.tan(steering_angle) * self.width / (2 * self.wheelbase))
+        center_wheel_velocity = velocity  # 中轮保持直线速度
+        
+        # 转换为扭矩命令（六轮设计）
+        wheel_torques = np.zeros(6)
+        # 前3个车轮：左、中、右
+        wheel_torques[0] = left_wheel_velocity * 10  # 前左轮
+        wheel_torques[1] = center_wheel_velocity * 10  # 前中轮
+        wheel_torques[2] = right_wheel_velocity * 10  # 前右轮
+        # 后3个车轮：左、中、右
+        wheel_torques[3] = left_wheel_velocity * 10  # 后左轮
+        wheel_torques[4] = center_wheel_velocity * 10  # 后中轮
+        wheel_torques[5] = right_wheel_velocity * 10  # 后右轮
+        
+        # 执行动力学仿真
+        state_info = self.dynamics.step(wheel_torques, dt)
+        
+        # 更新能量消耗
+        self.total_energy = state_info['energy_consumed']
 
     @property
     def position(self) -> Tuple[float, float]:
         """返回当前位置"""
-        return (self.x, self.y)
+        pos = self.dynamics.state['position']
+        return (pos[0], pos[1])
 
     @property
     def state(self) -> Tuple[float, float, float]:
         """返回完整状态 (x, y, theta)"""
-        return (self.x, self.y, self.theta)
+        pos = self.dynamics.state['position']
+        orient = self.dynamics.state['orientation']
+        return (pos[0], pos[1], orient[2])
+
+    @property
+    def x(self) -> float:
+        """返回x坐标"""
+        return self.dynamics.state['position'][0]
+
+    @property
+    def y(self) -> float:
+        """返回y坐标"""
+        return self.dynamics.state['position'][1]
+
+    @property
+    def theta(self) -> float:
+        """返回航向角"""
+        return self.dynamics.state['orientation'][2]
+
+    @property
+    def vx(self) -> float:
+        """返回x方向速度"""
+        return self.dynamics.state['velocity'][0]
+
+    @property
+    def vy(self) -> float:
+        """返回y方向速度"""
+        return self.dynamics.state['velocity'][1]
+
+    @property
+    def omega(self) -> float:
+        """返回角速度"""
+        return self.dynamics.state['angular_velocity'][2]
 
     def get_corners(self) -> np.ndarray:
         """
         获取月球车四个角点的坐标（用于碰撞检测）
-
         Returns:
             4x2的角点坐标数组
         """
@@ -200,17 +228,35 @@ class LunarRover:
         ])
 
         # 旋转矩阵
-        cos_theta = np.cos(self.theta)
-        sin_theta = np.sin(self.theta)
+        theta = self.theta
+        cos_theta = np.cos(theta)
+        sin_theta = np.sin(theta)
         rotation_matrix = np.array([
             [cos_theta, -sin_theta],
             [sin_theta, cos_theta]
         ])
 
         # 转换到世界坐标系
-        corners_world = np.dot(corners_local, rotation_matrix.T) + np.array([self.x, self.y])
+        pos = self.dynamics.state['position']
+        corners_world = np.dot(corners_local, rotation_matrix.T) + np.array([pos[0], pos[1]])
 
         return corners_world
+
+    def get_dynamics_state(self) -> Dict:
+        """
+        获取动力学状态
+        Returns:
+            动力学状态字典
+        """
+        return self.dynamics.get_dynamics_state()
+
+    def get_terrain_interaction_data(self) -> Dict:
+        """
+        获取地形交互数据
+        Returns:
+            地形交互数据字典
+        """
+        return self.dynamics.get_terrain_interaction_data()
 
 
 class LunarEnvironment:
@@ -222,7 +268,6 @@ class LunarEnvironment:
     def __init__(self, stage: int = 1, render: bool = True):
         """
         初始化月球环境
-
         Args:
             stage: 环境复杂度阶段
                    1 = 无障碍物 (Low complexity)
@@ -240,6 +285,9 @@ class LunarEnvironment:
 
         # 创建月球车
         self.rover = LunarRover()
+
+        # 创建动力学-感知集成模块
+        self.dynamics_integration = DynamicsPerceptionIntegration()
 
         # 目标位置
         self.target_x = 9.0
@@ -325,12 +373,16 @@ class LunarEnvironment:
     def reset(self) -> np.ndarray:
         """
         重置环境
-
         Returns:
             初始状态
         """
         # 重置月球车位置（确保远离边界和障碍物）
         self.rover.reset(x=1.0, y=1.0, theta=0.0)  # 朝右，朝向目标大方向
+
+        # 重置动力学-感知集成模块
+        position = (1.0, 1.0, 0.0)
+        orientation = (0.0, 0.0, 0.0)
+        self.dynamics_integration.reset(position, orientation)
 
         # 固定目标位置，让网络更容易学习稳定策略
         # 如需随机目标，可改为: np.random.uniform(8.0, 9.0)
@@ -361,10 +413,8 @@ class LunarEnvironment:
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict]:
         """
         执行一步动作
-
         Args:
             action: 动作索引 (0-6)
-
         Returns:
             (next_state, reward, done, info)
         """
@@ -378,6 +428,22 @@ class LunarEnvironment:
 
         # 执行月球车运动
         self.rover.step(velocity, steering_angle, dt)
+
+        # 更新动力学-感知集成模块
+        # 根据速度和转向角计算车轮扭矩命令
+        left_wheel_velocity = velocity * (1 - np.tan(steering_angle) * self.rover.width / (2 * self.rover.wheelbase))
+        right_wheel_velocity = velocity * (1 + np.tan(steering_angle) * self.rover.width / (2 * self.rover.wheelbase))
+        center_wheel_velocity = velocity  # 中轮保持直线速度
+        
+        wheel_torques = np.zeros(6)
+        wheel_torques[0] = left_wheel_velocity * 10  # 前左轮
+        wheel_torques[1] = center_wheel_velocity * 10  # 前中轮
+        wheel_torques[2] = right_wheel_velocity * 10  # 前右轮
+        wheel_torques[3] = left_wheel_velocity * 10  # 后左轮
+        wheel_torques[4] = center_wheel_velocity * 10  # 后中轮
+        wheel_torques[5] = right_wheel_velocity * 10  # 后右轮
+        
+        self.dynamics_integration.step(wheel_torques, dt)
 
         # 记录轨迹
         self.trajectory.append((self.rover.x, self.rover.y))
@@ -422,6 +488,7 @@ class LunarEnvironment:
             'distance_to_target': self._get_distance_to_target(),
             'collision_count': self.collision_count,
             'energy_consumed': self.rover.total_energy,
+            'dynamics_features': self.get_dynamics_features(),
         }
 
         return next_state, reward, done, info
@@ -1071,6 +1138,64 @@ class LunarEnvironment:
         plt.tight_layout()
         plt.pause(0.001)  # 1毫秒，更快刷新
 
+    def get_dynamics_features(self) -> Dict:
+        """
+        获取动力学特征，用于感知系统
+        Returns:
+            动力学特征字典
+        """
+        return self.dynamics_integration.get_dynamics_features_for_perception()
+    
+    def get_environment_context(self) -> Dict:
+        """
+        获取环境上下文信息
+        Returns:
+            环境上下文字典
+        """
+        return self.dynamics_integration.get_environment_context()
+    
+    def get_camera_pose(self) -> Dict:
+        """
+        获取相机姿态信息
+        Returns:
+            相机姿态字典
+        """
+        return self.dynamics_integration.get_camera_pose()
+    
+    def get_terrain_perception_aids(self) -> Dict:
+        """
+        获取地形感知辅助信息
+        Returns:
+            地形感知辅助信息字典
+        """
+        return self.dynamics_integration.get_terrain_perception_aids()
+    
+    def get_navigation_features(self) -> Dict:
+        """
+        获取导航系统所需的特征
+        Returns:
+            导航特征字典
+        """
+        return self.dynamics_integration.get_navigation_features()
+    
+    def calculate_motion_compensation(self) -> Dict:
+        """
+        计算运动补偿参数
+        Returns:
+            运动补偿参数字典
+        """
+        return self.dynamics_integration.calculate_motion_compensation()
+    
+    def get_collision_risk(self, obstacles: List[Dict]) -> List[Dict]:
+        """
+        计算碰撞风险
+        Args:
+            obstacles: 障碍物列表
+        Returns:
+            带有碰撞风险的障碍物列表
+        """
+        return self.dynamics_integration.get_collision_risk(obstacles)
+    
     def close(self):
         """关闭环境"""
         if self.fig is not None:

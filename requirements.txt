@@ -1,0 +1,28 @@
+# 月球车视觉导航与地形建模系统依赖
+
+# 核心深度学习框架
+torch>=1.12.1
+torchvision>=0.13.1
+
+# 科学计算
+numpy>=1.21.0
+scipy>=1.7.0
+
+# 数据可视化
+matplotlib>=3.5.0
+
+# 图像处理
+opencv-python>=4.5.0
+Pillow>=8.0.0
+
+# 进度条和日志
+tqdm>=4.62.0
+
+# 配置管理
+PyYAML>=6.0
+
+# 可选：TensorBoard支持
+# tensorboard>=2.8.0
+
+# 可选：YOLOv5相关（如需使用真实目标检测）
+# ultralytics>=8.0.0

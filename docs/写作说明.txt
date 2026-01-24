@@ -1,0 +1,23 @@
+论文撰写需求：
+
+1、根据论文题目《面向月面巡视器自主行走的数字孪生技术研究 》，全文撰写，满足学位答辩要求。论文格式要求，请参考《学位论文撰写规范.doc》，终稿的格式排版、参考文献引用、图表制作、图表编号、参考文献的交叉引用都要求调整完毕。
+
+2、请以“（论文模板）大论文修改 12-2.docx”为模板进行撰写，该模板已经遵循了《学位论文撰写规范.doc》要求，因为格式都是调整好的，方便后期做合稿。
+
+3、学校要求，学位论文，要有小论文成果支撑，所以之前发表了3篇小论文，尽量能在文章中提供支撑。3篇小论文见文件夹，内容如下：
+
+    中科院二区：《 Digital Twin of Space Environment: Development, Challenges, Applications, and Future Outlook》是一篇关于太空数字孪生的综述。可以支撑第1章 背景、现状。
+
+    中科院三区：《Path Planning for Lunar Rovers in Dynamic Environments: AnAutonomousNavigation Framework Enhanced by Digital  Twin-Based A*-D3QN》，是路径规划算法。可以支撑第5章，路径规划。
+
+    中科院四区：《ORB-SLAM2 System Enhanced with SiaT Hough Module on Mars Digital Twin Platform: 
+For Rock Counting and 3D Reconstruction in Martian Environments 》，是岩石识别算法。可以支撑第6章，岩石识别。
+
+
+4、10-12w字即可，总页数尽量在140-160页，紧紧围绕数字孪生主题，图文并茂，满足航天大学博士论文水平。
+
+5、撰写周期，2025年12月底前完成。
+
+
+
+
