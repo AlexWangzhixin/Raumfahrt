@@ -6,9 +6,22 @@
 
 import sys
 import os
+
+# 添加项目根目录到Python路径
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import numpy as np
 import torch
-from src.core.utils import get_timestamp, ensure_directory
+# 直接导入 utils.py 文件
+import sys
+import os
+import importlib.util
+
+# 导入 utils.py 文件
+spec = importlib.util.spec_from_file_location("utils", os.path.join(os.path.dirname(__file__), '..', 'src', 'core', 'utils.py'))
+utils = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(utils)
+
 from src.planning.local_planner.agent import D3QNAgent
 from src.config.config import TRAINING_PARAMS, PLANNING_PARAMS
 
@@ -28,19 +41,19 @@ class RLTraining:
         )
         self.training_params = TRAINING_PARAMS
         self.planning_params = PLANNING_PARAMS
-        self.timestamp = get_timestamp()
+        self.timestamp = utils.get_timestamp()
         
         # 创建训练日志目录
         self.log_dir = os.path.join(
             'outputs', 'logs', f'training_{self.timestamp}'
         )
-        ensure_directory(self.log_dir)
+        utils.ensure_directory(self.log_dir)
         
         # 创建检查点目录
         self.checkpoint_dir = os.path.join(
             'outputs', 'checkpoints', f'training_{self.timestamp}'
         )
-        ensure_directory(self.checkpoint_dir)
+        utils.ensure_directory(self.checkpoint_dir)
         
         # 训练统计
         self.stats = {
@@ -49,6 +62,12 @@ class RLTraining:
             'episode_steps': [],
             'q_values': [],
         }
+        
+        # 环境参数
+        self.start_position = np.array([0.0, 0.0])
+        self.goal_position = np.array([10.0, 10.0])
+        self.current_position = self.start_position.copy()
+        self.episode_steps = 0
     
     def train(self):
         """
@@ -73,12 +92,13 @@ class RLTraining:
                 next_state, reward, done, info = self._step_environment(action)
                 
                 # 存储经验
-                self.agent.store_transition(
+                self.agent.store_experience(
                     state, action, reward, next_state, done
                 )
                 
                 # 学习
-                loss, q_value = self.agent.learn()
+                loss = self.agent.train_step()
+                q_value = None
                 
                 # 更新状态
                 state = next_state
@@ -107,7 +127,7 @@ class RLTraining:
                 checkpoint_path = os.path.join(
                     self.checkpoint_dir, f'checkpoint_{episode}.pt'
                 )
-                self.agent.save(checkpoint_path)
+                self.agent.save_model(checkpoint_path, episode)
                 print(f"保存检查点到: {checkpoint_path}")
             
             # 评估
@@ -126,8 +146,9 @@ class RLTraining:
             初始状态
         """
         # 这里应该返回环境的初始状态
-        # 暂时返回一个模拟状态
-        return np.random.rand(8)  # 假设状态是8维的
+        # 暂时返回一个模拟的深度图状态
+        # 形状: (height, width, channels) = (80, 64, 4)
+        return np.random.rand(80, 64, 4)
     
     def _step_environment(self, action):
         """
@@ -141,7 +162,7 @@ class RLTraining:
         """
         # 这里应该执行实际的环境步骤
         # 暂时返回模拟数据
-        next_state = np.random.rand(8)
+        next_state = np.random.rand(80, 64, 4)
         reward = np.random.randn()
         done = np.random.random() < 0.1  # 10% 的概率结束
         info = {}

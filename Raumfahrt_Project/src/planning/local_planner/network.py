@@ -94,7 +94,7 @@ class DuelingDQN(nn.Module):
 
         # 处理深度图
         conv_output = self.conv_layers(state)
-        conv_flat = conv_output.view(conv_output.size(0), -1)
+        conv_flat = conv_output.reshape(conv_output.size(0), -1)
 
         # 处理额外特征
         if additional_features is not None:
@@ -102,7 +102,10 @@ class DuelingDQN(nn.Module):
             # 融合特征
             combined = torch.cat([conv_flat, feature_output], dim=1)
         else:
-            combined = conv_flat
+            # 当没有额外特征时，添加零向量
+            batch_size = conv_flat.size(0)
+            zero_features = torch.zeros(batch_size, 32, device=conv_flat.device)
+            combined = torch.cat([conv_flat, zero_features], dim=1)
 
         # 全连接层
         fc_output = self.fc_layers(combined)

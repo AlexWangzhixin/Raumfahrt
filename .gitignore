@@ -1,6 +1,10 @@
 # Ignore doc files
 docs/
 
+# Ignore data files
+data/
+outputs/
+
 # Ignore large files
 torch_*.dll
 torch_*.lib

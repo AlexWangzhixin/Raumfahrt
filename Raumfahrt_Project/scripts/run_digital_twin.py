@@ -180,6 +180,10 @@ def generate_visualizations(fixed_data, adaptive_data):
     """
     生成可视化图表
     """
+    # 设置matplotlib中文字体
+    plt.rcParams['font.sans-serif'] = ['SimHei']  # 使用黑体
+    plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+    
     # 创建可视化目录
     viz_dir = os.path.join(os.path.dirname(__file__), '..', 'outputs', 'visualizations')
     os.makedirs(viz_dir, exist_ok=True)

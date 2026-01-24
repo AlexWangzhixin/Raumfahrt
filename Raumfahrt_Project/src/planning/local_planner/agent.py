@@ -314,7 +314,7 @@ class D3QNAgent:
         if self.use_per and indices is not None:
             self.replay_buffer.update_priorities(
                 indices,
-                td_errors.abs().cpu().numpy()
+                td_errors.abs().detach().cpu().numpy()
             )
 
         # 记录统计
