@@ -1,0 +1,72 @@
+# Git忽略文件配置
+# 忽略所有与项目运行相关的临时文件和目录
+
+# 数据目录（不上传git）
+data/
+
+# 输出目录（运行生成的图表、日志等）
+outputs/
+
+# IDE配置目录
+.idea/
+.vscode/
+.trae/
+
+# 编译缓存
+__pycache__/
+*.pyc
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 环境配置文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 测试文件
+.pytest_cache/
+
+# 依赖包目录（如果使用虚拟环境）
+env/
+env.local/
+env.development.local/
+env.test.local/
+env.production.local/
+venv/
+venv.local/
+
+# 编辑器备份文件
+*~
+*.swp
+*.swo
+
+# 大型数据文件
+*.npz
+*.h5
+*.pth
+*.pt
+*.ckpt
+
+# 日志文件
+*.log
+*.txt
+
+# 文档生成文件
+build/
+dist/
+*.egg-info/
+
+# 本地配置文件
+local_settings.py
+settings.local.yaml
+
+# 导出的环境变量文件
+export.env
+
+# 其他临时文件
+.tmp/
+tmp/

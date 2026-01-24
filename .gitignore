@@ -1,40 +1,24 @@
-# 排除大型数据文件
-*.tiff
-*.tif
-*.pdf
-*.docx
-*.doc
-*.mp4
+# Ignore doc files
+docs/
 
-# 排除实验数据和结果
-*.csv
-*.png
-*.jpg
-*.jpeg
-
-# 排除编译文件
+# Ignore other files
+.vscode/
+.pytest_cache/
 __pycache__/
 *.pyc
 *.pyo
-
-# 排除临时文件
-~$*
-*.log
-
-# 排除操作系统文件
-.DS_Store
-Thumbs.db
-
-# 排除IDE文件
-.vscode/
-.idea/
+*.pyd
 *.swp
 *.swo
 *~
 
-# 排除虚拟环境
-venv/
-env/
-*.conda
-*.yml
-*.yaml
+# Ignore environment files
+lunar_env/
+
+# Ignore IDE files
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
