@@ -1,6 +1,14 @@
 # Ignore doc files
 docs/
 
+# Ignore large files
+torch_*.dll
+torch_*.lib
+cv2.pyd
+opencv_*.dll
+*.docx
+*.pdf
+
 # Ignore other files
 .vscode/
 .pytest_cache/
@@ -22,3 +30,17 @@ lunar_env/
 *.njsproj
 *.sln
 *.sw?
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore build files
+build/
+dist/
+*.egg-info/
+
+# Ignore test files
+coverage/
+.tox/
+
