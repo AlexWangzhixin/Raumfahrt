@@ -98,8 +98,11 @@ class LunarRoverDynamics:
         
         # 获取当前位置的土壤参数
         current_position = self.state['position']
+        curr_x, curr_y = current_position[0], current_position[1]
+        
         if self.env_model:
-            soil_props = self.env_model.get_physics_at(current_position)
+            # 使用新的get_soil_property方法获取土壤参数
+            soil_props = self.env_model.get_soil_property(curr_x, curr_y)
         else:
             # 如果没有环境模型，使用默认参数（压实月壤）
             soil_props = {'kc': 2.9e4, 'kphi': 1.5e6, 'n': 1.0, 'c': 1.1e3, 'phi': 35}
@@ -124,8 +127,16 @@ class LunarRoverDynamics:
         
         for i in range(6):
             # 计算单轮的受力和滑移
+            # 使用原有的calculate_wheel_soil_interaction方法
             traction, torque, sinkage, slip_ratio, rolling_resistance = self.calculate_wheel_soil_interaction(
                 i, wheel_load, soil_props, wheel_speeds[i], forward_velocity
+            )
+            
+            # 同时使用新的calculate_wheel_forces方法（用于对比和验证）
+            wheel_radius = self.params['wheel_radius']
+            wheel_linear_speed = wheel_speeds[i] * wheel_radius
+            H, R, z, s = self.calculate_wheel_forces(
+                wheel_linear_speed, forward_velocity, soil_props
             )
             
             # 累加到总牵引力和扭矩
@@ -144,7 +155,11 @@ class LunarRoverDynamics:
                 'sinkage': sinkage,
                 'traction': traction,
                 'rolling_resistance': rolling_resistance,
-                'torque': torque
+                'torque': torque,
+                'new_traction': H,
+                'new_resistance': R,
+                'new_sinkage': z,
+                'new_slip': s
             })
         
         # 计算净牵引力
@@ -350,6 +365,48 @@ class LunarRoverDynamics:
         torque = net_traction * r
         
         return net_traction, torque, sinkage_z, slip_ratio, rolling_resistance
+    
+    def calculate_wheel_forces(self, wheel_v, vehicle_v, soil_props):
+        """
+        计算单轮的受力 (基于 Bekker-Wong 理论)
+        Args:
+            wheel_v: 车轮线速度 (omega * r)
+            vehicle_v: 车体实际速度
+            soil_props: 土壤参数
+        """
+        # 1. 计算滑移率 (Slip Ratio)
+        epsilon = 1e-5
+        if abs(wheel_v) < epsilon:
+            slip = 0.0
+        else:
+            slip = (wheel_v - vehicle_v) / wheel_v
+            slip = np.clip(slip, -1.0, 1.0) # 限制范围
+            
+        # 2. 计算沉陷量 (Sinkage) z
+        # 简化公式: W = (kc/b + kphi) * z^n * A
+        # 这里为了简化，假设轮载荷固定为 W_wheel
+        W_wheel = self.params['mass'] * 1.62 / 8.0 # 单轮载荷
+        b = 0.15 # 轮宽
+        kc, kphi, n = soil_props['kc'], soil_props['kphi'], soil_props['n']
+        
+        # z = (W / (b * (kc/b + kphi)))^(1/n)
+        sinkage = (W_wheel / (b * (kc/b + kphi))) ** (1/n)
+        
+        # 3. 计算滚动阻力 (Rolling Resistance) R
+        # R = (b * k * z^(n+1)) / (n+1)
+        k_eq = kc/b + kphi
+        resistance = (b * k_eq * (sinkage ** (n+1))) / (n+1)
+        
+        # 4. 计算牵引力 (Traction/Drawbar Pull) H
+        # H = (Ac + W*tan(phi)) * (1 - exp(-slip/k_slip))
+        # 简化版剪切模型
+        c, phi = soil_props['c'], np.radians(soil_props['phi'])
+        contact_area = b * np.sqrt(self.params['wheel_radius'] * sinkage) # 估算接触面积
+        
+        max_shear = contact_area * c + W_wheel * np.tan(phi)
+        traction = max_shear * (1 - np.exp(-abs(slip) * 5.0)) * np.sign(slip)
+        
+        return traction, resistance, sinkage, slip
     
     def get_kinematic_model(self):
         """

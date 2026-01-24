@@ -37,6 +37,12 @@ class EnvironmentModeling:
             2: {'name': 'Rock',          'kc': 1e8,   'kphi': 1e8,   'n': 0.5, 'c': 1e5,    'phi': 45}  # 岩石
         }
         
+        # 土壤力学参数库 (Bekker参数)
+        self.soil_database = {
+            0: {'name': 'Regolith', 'kc': 1.4e3, 'kphi': 8.2e5, 'n': 1.0, 'phi': 30, 'c': 0.17e3}, # 0: 月壤
+            1: {'name': 'Rock',     'kc': 0.0,   'kphi': 1e9,   'n': 0.5, 'phi': 45, 'c': 1e5}     # 1: 岩石 (硬地面)
+        }
+        
         # 新增：物理属性地图层 (Physics Layer)
         # 存储每个网格的 [kc, kphi, n, c, phi]
         self.physics_map = np.zeros((self.map_height, self.map_width, 5))
@@ -300,6 +306,21 @@ class EnvironmentModeling:
         else:
             # 位置超出地图范围，返回默认值
             return self.soil_properties_db[1]
+    
+    def get_soil_property(self, x, y):
+        """根据坐标获取土壤物理参数"""
+        map_x = int((x + self.map_size[0]/2) / self.map_resolution)
+        map_y = int((y + self.map_size[1]/2) / self.map_resolution)
+        
+        # 边界检查
+        if 0 <= map_x < self.map_width and 0 <= map_y < self.map_height:
+            # 假设你有一个语义图层 self.semantic_map
+            # 如果还没有，可以用 traversability_map 暂时模拟：值越小越像岩石
+            if self.traversability_map[map_y, map_x] < 0.5:
+                return self.soil_database[1] # 岩石
+            else:
+                return self.soil_database[0] # 月壤
+        return self.soil_database[0] # 默认返回月壤
     
     def generate_random_semantic_segmentation(self):
         """
