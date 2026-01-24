@@ -108,6 +108,20 @@ class EnvironmentModeling:
         Args:
             semantic_segmentation: 语义分割结果
         """
+        # 检查语义分割的大小是否与地图大小匹配
+        seg_height, seg_width = semantic_segmentation.shape
+        if seg_height != self.map_height or seg_width != self.map_width:
+            print(f"警告: 语义分割大小 ({seg_height}x{seg_width}) 与地图大小 ({self.map_height}x{self.map_width}) 不匹配")
+            # 调整语义分割的大小以匹配地图大小
+            from skimage.transform import resize
+            semantic_segmentation = resize(
+                semantic_segmentation,
+                (self.map_height, self.map_width),
+                order=0,  # 最近邻插值，保持标签值不变
+                preserve_range=True
+            ).astype(int)
+            print(f"已调整语义分割大小为: {self.map_height}x{self.map_width}")
+        
         # 这里可以根据语义分割结果更新障碍物地图和可通行性地图
         # 简单示例：将岩石区域标记为障碍物
         rock_regions = np.where(semantic_segmentation == 2)
@@ -176,15 +190,21 @@ class EnvironmentModeling:
                 self.obstacles.append(obstacle)
                 print(f"检测到障碍物: ID={obstacle['id']}, 位置={obstacle['position']}, 大小={obstacle['size']}")
     
-    def visualize_maps(self):
+    def visualize_maps(self, include_physics=True):
         """
         可视化环境地图
+        
+        Args:
+            include_physics: 是否包含物理属性地图
         
         Returns:
             可视化图像
         """
-        # 创建可视化图像
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
+        # 根据是否包含物理属性地图确定子图数量
+        if include_physics:
+            fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(15, 10))
+        else:
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
         
         # 高程图
         im1 = ax1.imshow(self.elevation_map, cmap='terrain', origin='lower')
@@ -200,6 +220,23 @@ class EnvironmentModeling:
         im3 = ax3.imshow(self.traversability_map, cmap='viridis', origin='lower')
         ax3.set_title('可通行性图')
         fig.colorbar(im3, ax=ax3, label='可通行性')
+        
+        # 物理属性地图
+        if include_physics:
+            #  cohesiveness (kc)
+            im4 = ax4.imshow(self.physics_map[:, :, 0], cmap='plasma', origin='lower')
+            ax4.set_title('土壤 cohesive modulus (kc)')
+            fig.colorbar(im4, ax=ax4, label='kc (Pa/m)')
+            
+            #  frictional modulus (kphi)
+            im5 = ax5.imshow(self.physics_map[:, :, 1], cmap='inferno', origin='lower', vmin=0, vmax=5e6)
+            ax5.set_title('土壤 frictional modulus (kphi)')
+            fig.colorbar(im5, ax=ax5, label='kphi (Pa)')
+            
+            #  internal friction angle (phi)
+            im6 = ax6.imshow(self.physics_map[:, :, 4], cmap='magma', origin='lower', vmin=20, vmax=50)
+            ax6.set_title('土壤 internal friction angle (phi)')
+            fig.colorbar(im6, ax=ax6, label='phi (degrees)')
         
         plt.tight_layout()
         
@@ -263,6 +300,47 @@ class EnvironmentModeling:
         else:
             # 位置超出地图范围，返回默认值
             return self.soil_properties_db[1]
+    
+    def generate_random_semantic_segmentation(self):
+        """
+        生成随机但合理的语义分割数据
+        
+        Returns:
+            semantic_segmentation: 语义分割数据
+        """
+        # 创建语义分割数组
+        semantic_segmentation = np.zeros((self.map_height, self.map_width), dtype=int)
+        
+        # 生成随机地形分布
+        # 70% 压实月壤 (label 1)
+        # 20% 松软月壤 (label 0)
+        # 10% 岩石 (label 2)
+        for i in range(self.map_height):
+            for j in range(self.map_width):
+                rand = np.random.rand()
+                if rand < 0.1:
+                    semantic_segmentation[i, j] = 2  # 岩石
+                elif rand < 0.3:
+                    semantic_segmentation[i, j] = 0  # 松软月壤
+                else:
+                    semantic_segmentation[i, j] = 1  # 压实月壤
+        
+        # 添加一些连续的区域，使分布更合理
+        for _ in range(20):
+            # 随机选择区域中心
+            center_i = np.random.randint(0, self.map_height)
+            center_j = np.random.randint(0, self.map_width)
+            # 随机选择区域大小
+            size = np.random.randint(5, 20)
+            # 随机选择地形类型
+            terrain_type = np.random.choice([0, 1, 2])
+            
+            # 填充区域
+            for i in range(max(0, center_i - size//2), min(self.map_height, center_i + size//2)):
+                for j in range(max(0, center_j - size//2), min(self.map_width, center_j + size//2)):
+                    semantic_segmentation[i, j] = terrain_type
+        
+        return semantic_segmentation
     
     def load_map(self, filename):
         """

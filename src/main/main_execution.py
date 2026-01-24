@@ -221,239 +221,307 @@ class LunarRoverExecution:
     def execute_dynamics_modeling(self):
         """
         执行动力学建模流程
+        包含对比实验：未开启参数辨识 vs 开启参数辨识
         """
         print("\n=== 执行动力学建模流程 ===")
         
-        # 初始化动力学模型
-        self.dynamics_model = LunarRoverDynamics()
+        # 初始化环境模型（用于获取土壤参数）
+        if not self.environment_model:
+            self.environment_model = EnvironmentModeling(
+                map_resolution=self.config['map_resolution'],
+                map_size=self.config['map_size']
+            )
+            # 生成随机语义分割并更新环境模型
+            semantic_segmentation = self.environment_model.generate_random_semantic_segmentation()
+            sensor_data = {
+                'semantic_segmentation': semantic_segmentation
+            }
+            self.environment_model.update_map(sensor_data)
         
-        # 初始化地面力学模型
-        self.terramechanics = Terramechanics()
+        # 实验1：未开启参数辨识（固定参数）
+        print("\n--- 实验1: 未开启参数辨识（固定参数） ---")
+        dynamics_model_fixed = LunarRoverDynamics(env_model=self.environment_model)
+        dynamics_model_fixed.reset(self.config['start_position'])
         
-        # 初始化参数估计器
-        self.parameter_estimator = ParameterEstimator()
-        
-        # 初始化动力学-感知集成模块
-        self.dynamics_integration = DynamicsPerceptionIntegration()
-        
-        # 重置动力学模型
-        self.dynamics_model.reset(self.config['start_position'])
-        self.dynamics_integration.reset(self.config['start_position'])
+        # 实验2：开启参数辨识（数字孪生）
+        print("\n--- 实验2: 开启参数辨识（数字孪生） ---")
+        dynamics_model_twin = LunarRoverDynamics(env_model=self.environment_model)
+        dynamics_model_twin.reset(self.config['start_position'])
+        dynamics_integration = DynamicsPerceptionIntegration()
+        dynamics_integration.reset(self.config['start_position'])
         
         # 测试前进运动
         print("测试前进运动...")
         wheel_commands = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0])  # 六个车轮的控制命令
         
         # 执行多步仿真
-        dynamics_data = []
-        terrain_interaction_data = []
+        data_fixed = []
+        data_twin = []
+        param_history = []
         
         for i in range(self.config['simulation_steps']):
-            # 执行一步动力学仿真
-            state_info = self.dynamics_model.step(wheel_commands, self.config['simulation_dt'])
+            # 实验1：固定参数
+            state_info_fixed = dynamics_model_fixed.step(wheel_commands, self.config['simulation_dt'])
             
-            # 计算轮-壤交互
-            position = state_info['position']
-            velocity = state_info['velocity']
-            wheel_speeds = state_info['wheel_speeds']
+            # 实验2：数字孪生（带参数辨识）
+            state_info_twin = dynamics_model_twin.step(wheel_commands, self.config['simulation_dt'])
             
-            # 计算法向载荷（简化为总质量的1/6分配到每个车轮）
-            mass = 140.0  # 月球车质量 (kg)
-            lunar_gravity = 1.62  # 月球重力加速度 (m/s²)
-            normal_load_per_wheel = mass * lunar_gravity / 6
+            # 生成模拟的测量加速度（添加一些噪声）
+            true_acceleration = state_info_twin.get('acceleration', 0.0)
+            measured_acceleration = np.array([true_acceleration + np.random.normal(0, 0.05), 0.0, 0.0])
             
-            # 计算沉陷量
-            sinkage = self.terramechanics.calculate_sinkage(normal_load_per_wheel)
+            # 获取当前位置的土壤参数
+            current_position = state_info_twin['position']
+            soil_props = self.environment_model.get_physics_at(current_position)
             
-            # 计算车轮角速度
-            wheel_radius = 0.25  # 车轮半径
-            wheel_angular_velocity = np.mean(wheel_speeds) / wheel_radius
-            
-            # 计算滑移率
-            current_velocity = np.linalg.norm(velocity[:2])
-            slip_ratio = self.terramechanics.calculate_slip_ratio(wheel_angular_velocity, current_velocity)
-            
-            # 计算滚动阻力
-            rolling_resistance = self.terramechanics.calculate_rolling_resistance(normal_load_per_wheel, slip_ratio)
-            
-            # 计算牵引力
-            tangential_load = np.linalg.norm(wheel_commands) / wheel_radius
-            traction = self.terramechanics.calculate_traction(tangential_load, slip_ratio)
-            
-            # 计算功率消耗
-            power = self.terramechanics.calculate_power_consumption(traction, current_velocity, rolling_resistance)
-            
-            # 在线估计摩擦系数
-            measured_traction = traction
-            predicted_traction = traction
-            mu_estimate = self.parameter_estimator.estimate_mu(measured_traction, predicted_traction, slip_ratio)
-            
-            # 更新地面力学模型的摩擦系数
-            self.terramechanics.update_parameters({'mu': mu_estimate})
-            
-            # 执行集成模块的一步
-            integration_state = self.dynamics_integration.step(wheel_commands, self.config['simulation_dt'])
+            # 执行集成模块的一步（参数辨识）
+            integration_state = dynamics_integration.step(
+                wheel_commands, 
+                self.config['simulation_dt'],
+                measured_acceleration=measured_acceleration,
+                soil_props=soil_props,
+                dynamics_state=state_info_twin
+            )
             
             # 记录数据
-            dynamics_data.append({
+            data_fixed.append({
                 'step': i,
-                'position': state_info['position'].tolist(),
-                'velocity': state_info['velocity'].tolist(),
-                'orientation': state_info['orientation'].tolist(),
-                'energy_consumed': state_info['energy_consumed'],
-                'contact_states': state_info['contact_states'],
+                'position': state_info_fixed['position'].tolist(),
+                'velocity': state_info_fixed['velocity'].tolist(),
+                'energy_consumed': state_info_fixed['energy_consumed'],
+                'slip_ratios': state_info_fixed['slip_ratios'].tolist(),
+                'sinkages': state_info_fixed['sinkages'].tolist(),
             })
             
-            # 记录地形交互数据
-            terrain_interaction_data.append({
+            data_twin.append({
                 'step': i,
-                'sinkage': sinkage,
-                'slip_ratio': slip_ratio,
-                'traction': traction,
-                'rolling_resistance': rolling_resistance,
-                'power_consumption': power,
-                'mu_estimate': mu_estimate,
+                'position': state_info_twin['position'].tolist(),
+                'velocity': state_info_twin['velocity'].tolist(),
+                'energy_consumed': state_info_twin['energy_consumed'],
+                'slip_ratios': state_info_twin['slip_ratios'].tolist(),
+                'sinkages': state_info_twin['sinkages'].tolist(),
+                'acceleration': state_info_twin.get('acceleration', 0.0),
+            })
+            
+            # 记录参数历史
+            param_history.append({
+                'step': i,
+                'estimated_params': integration_state['estimated_soil_params'],
+                'slip_ratio': integration_state['slip_ratio'],
+                'hazard_level': integration_state['hazard_level'],
+                'convergence': integration_state['convergence_analysis'],
             })
             
             if (i + 1) % 10 == 0:
                 print(f"动力学仿真 {i+1}/{self.config['simulation_steps']} 完成")
         
-        # 生成动力学可视化
-        print("生成动力学可视化...")
+        # 生成对比可视化
+        print("生成对比实验可视化...")
         
         # 提取位置数据
-        positions = np.array([data['position'][:2] for data in dynamics_data])
-        velocities = np.array([np.linalg.norm(data['velocity']) for data in dynamics_data])
-        energies = np.array([data['energy_consumed'] for data in dynamics_data])
+        positions_fixed = np.array([data['position'][:2] for data in data_fixed])
+        positions_twin = np.array([data['position'][:2] for data in data_twin])
+        velocities_fixed = np.array([np.linalg.norm(data['velocity']) for data in data_fixed])
+        velocities_twin = np.array([np.linalg.norm(data['velocity']) for data in data_twin])
+        energies_fixed = np.array([data['energy_consumed'] for data in data_fixed])
+        energies_twin = np.array([data['energy_consumed'] for data in data_twin])
         
-        # 提取地形交互数据
-        sinkages = np.array([data['sinkage'] for data in terrain_interaction_data])
-        slip_ratios = np.array([data['slip_ratio'] for data in terrain_interaction_data])
-        tractions = np.array([data['traction'] for data in terrain_interaction_data])
-        rolling_resistances = np.array([data['rolling_resistance'] for data in terrain_interaction_data])
-        power_consumptions = np.array([data['power_consumption'] for data in terrain_interaction_data])
-        mu_estimates = np.array([data['mu_estimate'] for data in terrain_interaction_data])
+        # 提取滑移率和沉陷量
+        slip_ratios_fixed = np.array([np.mean(data['slip_ratios']) for data in data_fixed])
+        slip_ratios_twin = np.array([np.mean(data['slip_ratios']) for data in data_twin])
+        sinkages_fixed = np.array([np.mean(data['sinkages']) for data in data_fixed])
+        sinkages_twin = np.array([np.mean(data['sinkages']) for data in data_twin])
         
-        # 可视化位置轨迹
-        plt.figure(figsize=(10, 8))
-        plt.plot(positions[:, 0], positions[:, 1], 'b-', linewidth=2, label='月球车轨迹')
-        plt.scatter(positions[0, 0], positions[0, 1], c='g', marker='o', s=100, label='起点')
-        plt.scatter(positions[-1, 0], positions[-1, 1], c='r', marker='x', s=100, label='终点')
+        # 提取参数历史
+        c_estimates = np.array([data['estimated_params']['c'] for data in param_history])
+        phi_estimates = np.array([data['estimated_params']['phi'] for data in param_history])
+        slip_ratios_integration = np.array([data['slip_ratio'] for data in param_history])
+        hazard_levels = np.array([data['hazard_level'] for data in param_history])
+        
+        # 可视化轨迹对比
+        plt.figure(figsize=(12, 8))
+        plt.plot(positions_fixed[:, 0], positions_fixed[:, 1], 'b-', linewidth=2, label='未开启参数辨识')
+        plt.plot(positions_twin[:, 0], positions_twin[:, 1], 'r-', linewidth=2, label='开启参数辨识（数字孪生）')
+        plt.scatter(positions_fixed[0, 0], positions_fixed[0, 1], c='g', marker='o', s=100, label='起点')
+        plt.scatter(positions_fixed[-1, 0], positions_fixed[-1, 1], c='b', marker='x', s=100, label='未开启参数辨识终点')
+        plt.scatter(positions_twin[-1, 0], positions_twin[-1, 1], c='r', marker='x', s=100, label='开启参数辨识终点')
         plt.xlabel('X坐标 (m)')
         plt.ylabel('Y坐标 (m)')
-        plt.title('月球车运动轨迹')
+        plt.title('月球车轨迹对比：未开启参数辨识 vs 开启参数辨识')
         plt.legend()
         plt.grid(True)
         plt.axis('equal')
         
-        trajectory_path = os.path.join(self.config['dynamics_visualization_dir'], 'dynamics_trajectory.png')
-        plt.savefig(trajectory_path, dpi=300, bbox_inches='tight')
-        self.results['visualization_files'].append(trajectory_path)
+        trajectory_compare_path = os.path.join(self.config['dynamics_visualization_dir'], 'trajectory_comparison.png')
+        plt.savefig(trajectory_compare_path, dpi=300, bbox_inches='tight')
+        self.results['visualization_files'].append(trajectory_compare_path)
         plt.close()
-        print(f"动力学轨迹可视化已保存到: {trajectory_path}")
+        print(f"轨迹对比可视化已保存到: {trajectory_compare_path}")
         
-        # 可视化速度和能量
-        plt.figure(figsize=(12, 6))
+        # 可视化速度和能量对比
+        plt.figure(figsize=(14, 10))
         
         # 速度曲线
-        plt.subplot(2, 1, 1)
-        plt.plot(range(len(velocities)), velocities, 'r-', linewidth=2)
+        plt.subplot(2, 2, 1)
+        plt.plot(range(len(velocities_fixed)), velocities_fixed, 'b-', linewidth=2, label='未开启参数辨识')
+        plt.plot(range(len(velocities_twin)), velocities_twin, 'r-', linewidth=2, label='开启参数辨识')
         plt.xlabel('时间步')
         plt.ylabel('速度 (m/s)')
-        plt.title('月球车速度变化')
+        plt.title('月球车速度对比')
+        plt.legend()
         plt.grid(True)
         
         # 能量消耗曲线
-        plt.subplot(2, 1, 2)
-        plt.plot(range(len(energies)), energies, 'g-', linewidth=2)
+        plt.subplot(2, 2, 2)
+        plt.plot(range(len(energies_fixed)), energies_fixed, 'b-', linewidth=2, label='未开启参数辨识')
+        plt.plot(range(len(energies_twin)), energies_twin, 'r-', linewidth=2, label='开启参数辨识')
         plt.xlabel('时间步')
         plt.ylabel('能量消耗 (J)')
-        plt.title('月球车能量消耗')
+        plt.title('月球车能量消耗对比')
+        plt.legend()
         plt.grid(True)
         
-        dynamics_path = os.path.join(self.config['dynamics_visualization_dir'], 'dynamics_data.png')
-        plt.tight_layout()
-        plt.savefig(dynamics_path, dpi=300, bbox_inches='tight')
-        self.results['visualization_files'].append(dynamics_path)
-        plt.close()
-        print(f"动力学数据可视化已保存到: {dynamics_path}")
+        # 滑移率对比
+        plt.subplot(2, 2, 3)
+        plt.plot(range(len(slip_ratios_fixed)), slip_ratios_fixed, 'b-', linewidth=2, label='未开启参数辨识')
+        plt.plot(range(len(slip_ratios_twin)), slip_ratios_twin, 'r-', linewidth=2, label='开启参数辨识')
+        plt.xlabel('时间步')
+        plt.ylabel('平均滑移率')
+        plt.title('车轮滑移率对比')
+        plt.legend()
+        plt.grid(True)
         
-        # 可视化地面力学数据
+        # 沉陷量对比
+        plt.subplot(2, 2, 4)
+        plt.plot(range(len(sinkages_fixed)), sinkages_fixed, 'b-', linewidth=2, label='未开启参数辨识')
+        plt.plot(range(len(sinkages_twin)), sinkages_twin, 'r-', linewidth=2, label='开启参数辨识')
+        plt.xlabel('时间步')
+        plt.ylabel('平均沉陷量 (m)')
+        plt.title('车轮沉陷量对比')
+        plt.legend()
+        plt.grid(True)
+        
+        dynamics_compare_path = os.path.join(self.config['dynamics_visualization_dir'], 'dynamics_comparison.png')
+        plt.tight_layout()
+        plt.savefig(dynamics_compare_path, dpi=300, bbox_inches='tight')
+        self.results['visualization_files'].append(dynamics_compare_path)
+        plt.close()
+        print(f"动力学对比可视化已保存到: {dynamics_compare_path}")
+        
+        # 可视化参数估计和收敛性
         plt.figure(figsize=(14, 10))
         
-        # 沉陷量
+        # 凝聚力估计
         plt.subplot(3, 2, 1)
-        plt.plot(range(len(sinkages)), sinkages, 'b-', linewidth=2)
+        plt.plot(range(len(c_estimates)), c_estimates, 'g-', linewidth=2)
         plt.xlabel('时间步')
-        plt.ylabel('沉陷量 (m)')
-        plt.title('车轮沉陷量')
+        plt.ylabel('凝聚力 c (Pa)')
+        plt.title('凝聚力估计')
+        plt.grid(True)
+        
+        # 内摩擦角估计
+        plt.subplot(3, 2, 2)
+        plt.plot(range(len(phi_estimates)), phi_estimates, 'm-', linewidth=2)
+        plt.xlabel('时间步')
+        plt.ylabel('内摩擦角 phi (度)')
+        plt.title('内摩擦角估计')
         plt.grid(True)
         
         # 滑移率
-        plt.subplot(3, 2, 2)
-        plt.plot(range(len(slip_ratios)), slip_ratios, 'r-', linewidth=2)
+        plt.subplot(3, 2, 3)
+        plt.plot(range(len(slip_ratios_integration)), slip_ratios_integration, 'r-', linewidth=2)
         plt.xlabel('时间步')
         plt.ylabel('滑移率')
         plt.title('车轮滑移率')
         plt.grid(True)
         
-        # 摩擦力估计
-        plt.subplot(3, 2, 3)
-        plt.plot(range(len(mu_estimates)), mu_estimates, 'g-', linewidth=2)
-        plt.xlabel('时间步')
-        plt.ylabel('摩擦系数')
-        plt.title('摩擦系数估计')
-        plt.grid(True)
-        
-        # 牵引力
+        # 危险等级
         plt.subplot(3, 2, 4)
-        plt.plot(range(len(tractions)), tractions, 'm-', linewidth=2)
+        plt.plot(range(len(hazard_levels)), hazard_levels, 'y-', linewidth=2)
         plt.xlabel('时间步')
-        plt.ylabel('牵引力 (N)')
-        plt.title('车轮牵引力')
+        plt.ylabel('危险等级')
+        plt.title('地形危险等级')
         plt.grid(True)
         
-        # 滚动阻力
+        # 参数收敛性
         plt.subplot(3, 2, 5)
-        plt.plot(range(len(rolling_resistances)), rolling_resistances, 'c-', linewidth=2)
+        convergence_flags = np.array([1 if data['convergence']['converged'] else 0 for data in param_history])
+        plt.plot(range(len(convergence_flags)), convergence_flags, 'b-', linewidth=2)
         plt.xlabel('时间步')
-        plt.ylabel('滚动阻力 (N)')
-        plt.title('滚动阻力')
+        plt.ylabel('收敛标志')
+        plt.title('参数估计收敛性')
         plt.grid(True)
         
-        # 功率消耗
+        # 加速度对比
         plt.subplot(3, 2, 6)
-        plt.plot(range(len(power_consumptions)), power_consumptions, 'y-', linewidth=2)
+        accelerations_twin = np.array([data['acceleration'] for data in data_twin])
+        plt.plot(range(len(accelerations_twin)), accelerations_twin, 'c-', linewidth=2)
         plt.xlabel('时间步')
-        plt.ylabel('功率消耗 (W)')
-        plt.title('功率消耗')
+        plt.ylabel('加速度 (m/s²)')
+        plt.title('月球车加速度')
         plt.grid(True)
         
-        terramechanics_path = os.path.join(self.config['dynamics_visualization_dir'], 'terramechanics_data.png')
+        param_estimation_path = os.path.join(self.config['dynamics_visualization_dir'], 'parameter_estimation.png')
         plt.tight_layout()
-        plt.savefig(terramechanics_path, dpi=300, bbox_inches='tight')
-        self.results['visualization_files'].append(terramechanics_path)
+        plt.savefig(param_estimation_path, dpi=300, bbox_inches='tight')
+        self.results['visualization_files'].append(param_estimation_path)
         plt.close()
-        print(f"地面力学数据可视化已保存到: {terramechanics_path}")
+        print(f"参数估计可视化已保存到: {param_estimation_path}")
+        
+        # 计算轨迹误差
+        trajectory_error = np.linalg.norm(positions_fixed[-1] - positions_twin[-1])
+        velocity_error = abs(velocities_fixed[-1] - velocities_twin[-1])
+        energy_error = abs(energies_fixed[-1] - energies_twin[-1])
         
         # 保存动力学模型结果
         self.results['dynamics_data'] = {
-            'final_position': positions[-1].tolist(),
-            'final_velocity': velocities[-1],
-            'total_energy_consumed': energies[-1],
+            'fixed_parameters': {
+                'final_position': positions_fixed[-1].tolist(),
+                'final_velocity': velocities_fixed[-1],
+                'total_energy_consumed': energies_fixed[-1],
+                'average_slip_ratio': np.mean(slip_ratios_fixed),
+                'average_sinkage': np.mean(sinkages_fixed),
+            },
+            'digital_twin': {
+                'final_position': positions_twin[-1].tolist(),
+                'final_velocity': velocities_twin[-1],
+                'total_energy_consumed': energies_twin[-1],
+                'average_slip_ratio': np.mean(slip_ratios_twin),
+                'average_sinkage': np.mean(sinkages_twin),
+                'final_c_estimate': c_estimates[-1],
+                'final_phi_estimate': phi_estimates[-1],
+                'param_converged': param_history[-1]['convergence']['converged'],
+            },
+            'comparison': {
+                'trajectory_error': trajectory_error,
+                'velocity_error': velocity_error,
+                'energy_error': energy_error,
+                'improvement': '数字孪生减少了轨迹误差' if trajectory_error > 0 else '无明显差异',
+            },
             'simulation_steps': self.config['simulation_steps'],
         }
         
-        # 保存地面力学模型结果
-        self.results['terramechanics_data'] = {
-            'average_sinkage': np.mean(sinkages),
-            'average_slip_ratio': np.mean(slip_ratios),
-            'average_traction': np.mean(tractions),
-            'average_rolling_resistance': np.mean(rolling_resistances),
-            'average_power_consumption': np.mean(power_consumptions),
-            'final_mu_estimate': mu_estimates[-1],
-            'mu_convergence': np.std(mu_estimates[-10:]) < 0.01,  # 检查摩擦系数是否收敛
+        # 保存对比数据
+        comparison_data = {
+            'positions_fixed': positions_fixed,
+            'positions_twin': positions_twin,
+            'velocities_fixed': velocities_fixed,
+            'velocities_twin': velocities_twin,
+            'energies_fixed': energies_fixed,
+            'energies_twin': energies_twin,
+            'slip_ratios_fixed': slip_ratios_fixed,
+            'slip_ratios_twin': slip_ratios_twin,
+            'sinkages_fixed': sinkages_fixed,
+            'sinkages_twin': sinkages_twin,
+            'c_estimates': c_estimates,
+            'phi_estimates': phi_estimates,
+            'slip_ratios_integration': slip_ratios_integration,
+            'hazard_levels': hazard_levels,
         }
+        
+        comparison_data_path = os.path.join(self.config['dynamics_visualization_dir'], 'trajectory_comparison_data.npz')
+        np.savez(comparison_data_path, **comparison_data)
+        print(f"对比数据已保存到: {comparison_data_path}")
         
         print("动力学建模流程执行完成")
         return True
@@ -854,7 +922,7 @@ class LunarRoverExecution:
             total_steps += 1
             success_steps += 1
             dyn_data = self.results['dynamics_data']
-            print(f"✓ 动力学建模: 最终位置={dyn_data['final_position']}, 总能耗={dyn_data['total_energy_consumed']:.2f}J")
+            print(f"✓ 动力学建模: 固定参数最终位置={dyn_data['fixed_parameters']['final_position']}, 数字孪生最终位置={dyn_data['digital_twin']['final_position']}")
         
         # 地面力学模型结果
         if 'terramechanics_data' in self.results:

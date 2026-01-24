@@ -10,6 +10,7 @@ class ParameterEstimator:
     """
     参数估计器类
     基于感知数据在线辨识土壤参数
+    实现递归最小二乘法(RLS)参数估计
     """
     
     def __init__(self):
@@ -34,11 +35,19 @@ class ParameterEstimator:
         # 历史加速度
         self.acceleration_history = []
         
+        # 历史土壤参数
+        self.param_history = []
+        
+        # 递归最小二乘法参数
+        self.RLS_P = np.eye(2) * 100.0  # 协方差矩阵
+        self.RLS_lambda = 0.99  # 遗忘因子
+        
         print("参数估计器初始化完成")
     
     def update_parameters(self, measured_acceleration, predicted_acceleration, wheel_speeds, vehicle_velocity, soil_props):
         """
         使用感知数据更新土壤参数
+        实现递归最小二乘法(RLS)参数估计
         
         Args:
             measured_acceleration: 测量的加速度
@@ -73,23 +82,46 @@ class ParameterEstimator:
         if len(self.acceleration_history) > 10:
             self.acceleration_history.pop(0)
         
-        # 基于误差更新土壤参数
-        # 这里使用简单的梯度下降方法
+        # 使用递归最小二乘法(RLS)更新参数
         error_magnitude = np.linalg.norm(acc_error)
         
         if error_magnitude > 0.01:
-            # 调整摩擦角以适应实际加速度
-            self.estimated_soil_params['phi'] += self.learning_rate * np.sign(acc_error[0]) * error_magnitude
-            self.estimated_soil_params['phi'] = max(20, min(45, self.estimated_soil_params['phi']))  # 限制在合理范围内
+            # 构建观测向量 [slip_ratio, 1]
+            phi = np.array([[abs(slip_ratio)], [1.0]])
             
-            # 调整凝聚力
-            self.estimated_soil_params['c'] += self.learning_rate * np.sign(acc_error[0]) * error_magnitude * 10
-            self.estimated_soil_params['c'] = max(0, min(2000, self.estimated_soil_params['c']))  # 限制在合理范围内
+            # RLS更新
+            P_phi = self.RLS_P @ phi
+            lambda_ = self.RLS_lambda
+            denominator = lambda_ + phi.T @ P_phi
+            gain = P_phi / denominator
+            
+            # 观测值（加速度误差的大小）
+            y = abs(acc_error[0])
+            
+            # 计算预测值
+            predicted_y = phi.T @ np.array([[self.estimated_soil_params['c']], [self.estimated_soil_params['phi']]])
+            
+            # 更新参数
+            delta = gain * (y - predicted_y)
+            self.estimated_soil_params['c'] += delta[0, 0] * 0.1
+            self.estimated_soil_params['phi'] += delta[1, 0] * 0.01
+            
+            # 更新协方差矩阵
+            self.RLS_P = (self.RLS_P - gain @ phi.T @ self.RLS_P) / lambda_
+            
+            # 限制参数在合理范围内
+            self.estimated_soil_params['phi'] = max(20, min(45, self.estimated_soil_params['phi']))
+            self.estimated_soil_params['c'] = max(0, min(2000, self.estimated_soil_params['c']))
         
         # 融合当前土壤参数和估计参数
         for key in self.estimated_soil_params:
             if key in soil_props:
                 self.estimated_soil_params[key] = 0.7 * self.estimated_soil_params[key] + 0.3 * soil_props[key]
+        
+        # 存储参数历史
+        self.param_history.append(self.estimated_soil_params.copy())
+        if len(self.param_history) > 50:
+            self.param_history.pop(0)
         
         return self.estimated_soil_params
     
@@ -120,6 +152,49 @@ class ParameterEstimator:
             return 0.3  # 低危险
         else:
             return 0.0  # 安全
+    
+    def get_param_history(self):
+        """
+        获取参数历史
+        
+        Returns:
+            参数历史列表
+        """
+        return self.param_history.copy()
+    
+    def analyze_param_convergence(self):
+        """
+        分析参数收敛性
+        
+        Returns:
+            收敛性分析结果
+        """
+        if len(self.param_history) < 5:
+            return {
+                'converged': False,
+                'message': '历史数据不足'
+            }
+        
+        # 计算最近10个参数的标准差
+        recent_params = self.param_history[-10:]
+        c_values = [p['c'] for p in recent_params]
+        phi_values = [p['phi'] for p in recent_params]
+        
+        c_std = np.std(c_values)
+        phi_std = np.std(phi_values)
+        
+        # 判断是否收敛
+        c_converged = c_std < 50.0
+        phi_converged = phi_std < 1.0
+        
+        return {
+            'converged': c_converged and phi_converged,
+            'c_std': c_std,
+            'phi_std': phi_std,
+            'c_mean': np.mean(c_values),
+            'phi_mean': np.mean(phi_values),
+            'message': f'c标准差: {c_std:.2f}, phi标准差: {phi_std:.2f}'
+        }
 
 class DynamicsPerceptionIntegration:
     """
@@ -187,15 +262,17 @@ class DynamicsPerceptionIntegration:
         
         print(f"动力学与感知集成模块重置完成，起始位置: {start_position}")
     
-    def step(self, wheel_commands, dt, measured_acceleration=None, soil_props=None):
+    def step(self, wheel_commands, dt, measured_acceleration=None, soil_props=None, dynamics_state=None):
         """
         执行集成模块一步
+        实现数字孪生闭环
         
         Args:
             wheel_commands: 车轮控制命令
             dt: 时间步长
             measured_acceleration: 测量的加速度（可选）
             soil_props: 当前土壤参数（可选）
+            dynamics_state: 动力学模型状态（可选）
         
         Returns:
             integration_state: 集成状态
@@ -211,9 +288,12 @@ class DynamicsPerceptionIntegration:
             self._fuse_perception_data()
         
         # 更新土壤参数（如果有测量数据）
+        predicted_acceleration = np.array([0.0, 0.0, 0.0])
+        
         if measured_acceleration is not None and soil_props is not None:
-            # 计算预测的加速度
-            predicted_acceleration = np.array([0.0, 0.0, 0.0])  # 简化处理，实际应该从动力学模型获取
+            # 从动力学状态获取预测加速度
+            if dynamics_state and 'acceleration' in dynamics_state:
+                predicted_acceleration = np.array([dynamics_state['acceleration'], 0.0, 0.0])
             
             # 更新土壤参数
             self.estimated_soil_params = self.parameter_estimator.update_parameters(
@@ -237,6 +317,9 @@ class DynamicsPerceptionIntegration:
         # 检测危险地形
         hazard_level = self.parameter_estimator.detect_hazardous_terrain(current_slip_ratio)
         
+        # 分析参数收敛性
+        convergence_analysis = self.parameter_estimator.analyze_param_convergence()
+        
         # 构建集成状态
         integration_state = {
             'state_estimate': self.state_estimate.copy(),
@@ -246,6 +329,9 @@ class DynamicsPerceptionIntegration:
             'estimated_soil_params': self.estimated_soil_params.copy(),
             'slip_ratio': current_slip_ratio,
             'hazard_level': hazard_level,
+            'convergence_analysis': convergence_analysis,
+            'predicted_acceleration': predicted_acceleration,
+            'measured_acceleration': measured_acceleration,
         }
         
         return integration_state

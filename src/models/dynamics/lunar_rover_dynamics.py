@@ -104,59 +104,77 @@ class LunarRoverDynamics:
             # 如果没有环境模型，使用默认参数（压实月壤）
             soil_props = {'kc': 2.9e4, 'kphi': 1.5e6, 'n': 1.0, 'c': 1.1e3, 'phi': 35}
         
-        # 计算车身速度
-        left_speed = np.mean(wheel_speeds[[0, 2, 4]])  # 左侧车轮 (前左、中左、后左)
-        right_speed = np.mean(wheel_speeds[[1, 3, 5]])  # 右侧车轮 (前右、中右、后右)
-        
-        # 计算理论线速度和角速度
-        r = self.params['wheel_radius']
-        theoretical_linear_velocity = (left_speed + right_speed) * r / 2.0
-        theoretical_angular_velocity = (right_speed - left_speed) * r / self.params['track_width']
-        
-        # 计算前进速度
+        # 计算车身速度和方向
         yaw = self.state['orientation'][2]
-        forward_velocity = np.linalg.norm(self.state['velocity'][:2])
+        current_velocity = self.state['velocity'].copy()
+        forward_velocity = np.linalg.norm(current_velocity[:2])
         
-        # 计算每个车轮的负载（简化为均匀分布）
+        # 计算每个车轮的负载（考虑车辆姿态的影响，简化为均匀分布）
         total_mass = self.params['mass']
         g = self.params['lunar_gravity']
         wheel_load = (total_mass * g) / 6.0  # 每个车轮的负载
         
         # 计算轮壤交互
         total_traction = 0.0
+        total_resistance = 0.0
         total_torque = 0.0
+        
+        # 存储每个车轮的详细信息
+        wheel_info = []
         
         for i in range(6):
             # 计算单轮的受力和滑移
-            traction, torque, sinkage, slip_ratio = self.calculate_wheel_soil_interaction(
+            traction, torque, sinkage, slip_ratio, rolling_resistance = self.calculate_wheel_soil_interaction(
                 i, wheel_load, soil_props, wheel_speeds[i], forward_velocity
             )
             
             # 累加到总牵引力和扭矩
             total_traction += traction
+            total_resistance += rolling_resistance
             total_torque += abs(torque)
             
             # 更新滑移率和沉陷量
             self.slip_ratios[i] = slip_ratio
             self.sinkages[i] = sinkage
+            
+            # 存储车轮详细信息
+            wheel_info.append({
+                'wheel_idx': i,
+                'slip_ratio': slip_ratio,
+                'sinkage': sinkage,
+                'traction': traction,
+                'rolling_resistance': rolling_resistance,
+                'torque': torque
+            })
         
-        # 计算实际加速度
-        acceleration = total_traction / total_mass
+        # 计算净牵引力
+        net_traction = total_traction - total_resistance
         
-        # 更新速度
-        velocity = self.state['velocity'].copy()
+        # 计算实际加速度（基于力平衡方程）
+        # F = ma => a = F/m
+        acceleration = net_traction / total_mass
+        
+        # 更新速度向量
+        velocity = current_velocity.copy()
         velocity[0] += acceleration * np.cos(yaw) * dt
         velocity[1] += acceleration * np.sin(yaw) * dt
         velocity[2] = 0.0  # 假设在平面上运动
         
+        # 计算角速度（基于左右轮速度差）
+        left_speed = np.mean(wheel_speeds[[0, 2, 4]])  # 左侧车轮
+        right_speed = np.mean(wheel_speeds[[1, 3, 5]])  # 右侧车轮
+        r = self.params['wheel_radius']
+        angular_velocity = (right_speed - left_speed) * r / self.params['track_width']
+        
+        # 更新状态
         self.state['velocity'] = velocity
-        self.state['angular_velocity'][2] = theoretical_angular_velocity
+        self.state['angular_velocity'][2] = angular_velocity
         
         # 更新位置
         self.state['position'] += velocity * dt
         
         # 更新姿态
-        self.state['orientation'][2] += theoretical_angular_velocity * dt
+        self.state['orientation'][2] += angular_velocity * dt
         # 限制偏航角在 [-π, π] 范围内
         self.state['orientation'][2] = np.arctan2(np.sin(self.state['orientation'][2]), np.cos(self.state['orientation'][2]))
         
@@ -182,7 +200,11 @@ class LunarRoverDynamics:
             'sinkages': self.sinkages.copy(),
             'soil_properties': soil_props,
             'total_traction': total_traction,
+            'total_resistance': total_resistance,
+            'net_traction': net_traction,
             'total_torque': total_torque,
+            'acceleration': acceleration,
+            'wheel_info': wheel_info
         }
         
         return state_info
@@ -277,16 +299,24 @@ class LunarRoverDynamics:
             wheel_speed: 车轮角速度 (rad/s)
             forward_velocity: 前进速度 (m/s)
         Returns:
-            drawbar_pull (净牵引力), torque (扭矩), sinkage (沉陷量), slip_ratio (滑移率)
+            net_traction (净牵引力), torque (扭矩), sinkage (沉陷量), slip_ratio (滑移率), rolling_resistance (滚动阻力)
         """
         # 1. 沉陷量 z 计算 (Bekker公式)
         b = self.params['wheel_width'] # 车轮宽度
         kc, kphi, n = soil_props['kc'], soil_props['kphi'], soil_props['n']
         
-        sinkage_z = (load_W / (b * (kc/b + kphi))) ** (1/n)
+        # 防止除零错误
+        denominator = b * (kc/b + kphi)
+        if abs(denominator) < 1e-12:
+            sinkage_z = 0.0
+        else:
+            sinkage_z = (load_W / denominator) ** (1/n)
         
-        # 2. 滚动阻力 R 计算
-        rolling_resistance = (b * (kc/b + kphi) * (sinkage_z ** (n+1))) / (n+1)
+        # 2. 滚动阻力 R 计算（考虑沉陷的影响）
+        if n + 1 > 0:
+            rolling_resistance = (b * (kc/b + kphi) * (sinkage_z ** (n+1))) / (n+1)
+        else:
+            rolling_resistance = 0.0
         
         # 3. 计算滑移率
         r = self.params['wheel_radius']
@@ -301,9 +331,14 @@ class LunarRoverDynamics:
         # 4. 驱动力 H 计算 (基于Janosi-Hanamoto公式)
         c, phi = soil_props['c'], soil_props['phi']
         
-        # 剪切应力计算
+        # 剪切应力计算（考虑滑移率的影响）
         k = 0.6  # 剪切变形模量 (m)
-        tau = (c + load_W / (b * r) * np.tan(np.radians(phi))) * (1 - np.exp(-sinkage_z / k))
+        
+        # 滑移率对剪切应力的影响
+        slip_effect = 1.0 - np.exp(-abs(slip_ratio) * 10)  # 滑移率越大，剪切应力越大
+        
+        # 剪切应力计算
+        tau = (c + load_W / (b * r) * np.tan(np.radians(phi))) * slip_effect * (1 - np.exp(-sinkage_z / k))
         
         # 驱动力
         drawbar_pull = tau * b * r
@@ -314,7 +349,7 @@ class LunarRoverDynamics:
         # 6. 扭矩计算
         torque = net_traction * r
         
-        return net_traction, torque, sinkage_z, slip_ratio
+        return net_traction, torque, sinkage_z, slip_ratio, rolling_resistance
     
     def get_kinematic_model(self):
         """
