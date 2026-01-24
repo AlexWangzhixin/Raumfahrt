@@ -15,9 +15,18 @@ from config import config
 
 # 添加动力学模型导入
 import sys
-sys.path.append('..')
-from models.dynamics.yutu2_rover_dynamics import Yutu2RoverDynamics
-from models.dynamics.dynamics_perception_integration import DynamicsPerceptionIntegration
+import os
+
+# 获取当前文件目录的绝对路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 获取项目根目录
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
+# 将项目根目录添加到Python路径
+sys.path.append(project_root)
+
+from src.models.dynamics.lunar_rover_dynamics import LunarRoverDynamics
+from src.models.dynamics.dynamics_perception_integration import DynamicsPerceptionIntegration
+from src.models.environment.terramechanics import Terramechanics, ParameterEstimator
 
 # ==================== 中文字体配置 ====================
 import matplotlib
@@ -102,10 +111,9 @@ class LunarRover:
             theta: 初始航向角 (rad)
         """
         # 创建动力学模型
-        self.dynamics = Yutu2RoverDynamics()
+        self.dynamics = LunarRoverDynamics()
         self.dynamics.reset(
-            position=(x, y, 0.0),
-            orientation=(0.0, 0.0, theta)
+            start_position=(x, y, 0.0)
         )
         
         # 物理参数
@@ -118,6 +126,22 @@ class LunarRover:
 
         # 能量消耗记录
         self.total_energy = 0.0
+        
+        # 地面力学模型
+        self.terramechanics = Terramechanics()
+        
+        # 参数估计器
+        self.parameter_estimator = ParameterEstimator()
+        
+        # 轮-壤交互数据
+        self.terrain_interaction_data = {
+            'sinkage': [],
+            'slip_ratio': [],
+            'traction': [],
+            'rolling_resistance': [],
+            'power_consumption': [],
+            'mu_estimate': [],
+        }
 
     def reset(self, x: float = 0.5, y: float = 0.5, theta: float = 0.0):
         """
@@ -128,9 +152,10 @@ class LunarRover:
             theta: 初始航向角
         """
         self.dynamics.reset(
-            position=(x, y, 0.0),
-            orientation=(0.0, 0.0, theta)
+            start_position=(x, y, 0.0)
         )
+        # 设置航向角
+        self.dynamics.state['orientation'][2] = theta
         self.total_energy = 0.0
 
     def step(self, velocity: float, steering_angle: float, dt: float = 0.1):
@@ -161,11 +186,52 @@ class LunarRover:
         wheel_torques[4] = center_wheel_velocity * 10  # 后中轮
         wheel_torques[5] = right_wheel_velocity * 10  # 后右轮
         
+        # 计算法向载荷（简化为总质量的1/6分配到每个车轮）
+        normal_load_per_wheel = self.mass * 1.62 / 6  # 月球重力加速度为1.62 m/s²
+        
+        # 计算沉陷量
+        sinkage = self.terramechanics.calculate_sinkage(normal_load_per_wheel)
+        
+        # 计算车轮角速度
+        wheel_radius = 0.25  # 车轮半径
+        wheel_angular_velocity = velocity / wheel_radius
+        
+        # 计算滑移率
+        current_velocity = np.linalg.norm(self.dynamics.state['velocity'][:2])
+        slip_ratio = self.terramechanics.calculate_slip_ratio(wheel_angular_velocity, current_velocity)
+        
+        # 计算滚动阻力
+        rolling_resistance = self.terramechanics.calculate_rolling_resistance(normal_load_per_wheel, slip_ratio)
+        
+        # 计算牵引力
+        tangential_load = np.linalg.norm(wheel_torques) / wheel_radius
+        traction = self.terramechanics.calculate_traction(tangential_load, slip_ratio)
+        
+        # 计算功率消耗
+        power = self.terramechanics.calculate_power_consumption(traction, current_velocity, rolling_resistance)
+        
+        # 在线估计摩擦系数
+        # 假设测量的牵引力等于计算的牵引力（实际应用中应使用传感器数据）
+        measured_traction = traction
+        predicted_traction = traction
+        mu_estimate = self.parameter_estimator.estimate_mu(measured_traction, predicted_traction, slip_ratio)
+        
+        # 更新地面力学模型的摩擦系数
+        self.terramechanics.update_parameters({'mu': mu_estimate})
+        
         # 执行动力学仿真
         state_info = self.dynamics.step(wheel_torques, dt)
         
         # 更新能量消耗
         self.total_energy = state_info['energy_consumed']
+        
+        # 记录轮-壤交互数据
+        self.terrain_interaction_data['sinkage'].append(sinkage)
+        self.terrain_interaction_data['slip_ratio'].append(slip_ratio)
+        self.terrain_interaction_data['traction'].append(traction)
+        self.terrain_interaction_data['rolling_resistance'].append(rolling_resistance)
+        self.terrain_interaction_data['power_consumption'].append(power)
+        self.terrain_interaction_data['mu_estimate'].append(mu_estimate)
 
     @property
     def position(self) -> Tuple[float, float]:
@@ -248,7 +314,7 @@ class LunarRover:
         Returns:
             动力学状态字典
         """
-        return self.dynamics.get_dynamics_state()
+        return self.dynamics.get_state()
 
     def get_terrain_interaction_data(self) -> Dict:
         """
@@ -256,7 +322,7 @@ class LunarRover:
         Returns:
             地形交互数据字典
         """
-        return self.dynamics.get_terrain_interaction_data()
+        return self.terrain_interaction_data
 
 
 class LunarEnvironment:
@@ -381,8 +447,7 @@ class LunarEnvironment:
 
         # 重置动力学-感知集成模块
         position = (1.0, 1.0, 0.0)
-        orientation = (0.0, 0.0, 0.0)
-        self.dynamics_integration.reset(position, orientation)
+        self.dynamics_integration.reset(position)
 
         # 固定目标位置，让网络更容易学习稳定策略
         # 如需随机目标，可改为: np.random.uniform(8.0, 9.0)
@@ -413,85 +478,110 @@ class LunarEnvironment:
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict]:
         """
         执行一步动作
+
         Args:
             action: 动作索引 (0-6)
+
         Returns:
             (next_state, reward, done, info)
         """
-        # 获取动作对应的速度和转向角
-        velocity, steering_angle = config.ACTIONS[action]
+        try:
+            # 获取动作对应的速度和转向角
+            if 0 <= action < len(config.ACTIONS):
+                velocity, steering_angle = config.ACTIONS[action]
+            else:
+                # 处理无效动作
+                velocity, steering_angle = 0.0, 0.0
 
-        # 更新动态障碍物位置
-        dt = 0.2  # 时间步长 (增大以减少所需步数)
-        for obstacle in self.obstacles:
-            obstacle.update(dt)
+            # 更新动态障碍物位置
+            dt = 0.2  # 时间步长 (增大以减少所需步数)
+            for obstacle in self.obstacles:
+                obstacle.update(dt)
 
-        # 执行月球车运动
-        self.rover.step(velocity, steering_angle, dt)
+            # 执行月球车运动
+            self.rover.step(velocity, steering_angle, dt)
 
-        # 更新动力学-感知集成模块
-        # 根据速度和转向角计算车轮扭矩命令
-        left_wheel_velocity = velocity * (1 - np.tan(steering_angle) * self.rover.width / (2 * self.rover.wheelbase))
-        right_wheel_velocity = velocity * (1 + np.tan(steering_angle) * self.rover.width / (2 * self.rover.wheelbase))
-        center_wheel_velocity = velocity  # 中轮保持直线速度
-        
-        wheel_torques = np.zeros(6)
-        wheel_torques[0] = left_wheel_velocity * 10  # 前左轮
-        wheel_torques[1] = center_wheel_velocity * 10  # 前中轮
-        wheel_torques[2] = right_wheel_velocity * 10  # 前右轮
-        wheel_torques[3] = left_wheel_velocity * 10  # 后左轮
-        wheel_torques[4] = center_wheel_velocity * 10  # 后中轮
-        wheel_torques[5] = right_wheel_velocity * 10  # 后右轮
-        
-        self.dynamics_integration.step(wheel_torques, dt)
+            # 更新动力学-感知集成模块
+            # 根据速度和转向角计算车轮扭矩命令
+            left_wheel_velocity = velocity * (1 - np.tan(steering_angle) * self.rover.width / (2 * self.rover.wheelbase))
+            right_wheel_velocity = velocity * (1 + np.tan(steering_angle) * self.rover.width / (2 * self.rover.wheelbase))
+            center_wheel_velocity = velocity  # 中轮保持直线速度
+            
+            wheel_torques = np.zeros(6)
+            wheel_torques[0] = left_wheel_velocity * 10  # 前左轮
+            wheel_torques[1] = center_wheel_velocity * 10  # 前中轮
+            wheel_torques[2] = right_wheel_velocity * 10  # 前右轮
+            wheel_torques[3] = left_wheel_velocity * 10  # 后左轮
+            wheel_torques[4] = center_wheel_velocity * 10  # 后中轮
+            wheel_torques[5] = right_wheel_velocity * 10  # 后右轮
+            
+            self.dynamics_integration.step(wheel_torques, dt)
 
-        # 记录轨迹
-        self.trajectory.append((self.rover.x, self.rover.y))
+            # 记录轨迹
+            self.trajectory.append((self.rover.x, self.rover.y))
 
-        # 增加步数
-        self.step_count += 1
+            # 增加步数
+            self.step_count += 1
 
-        # 检查碰撞
-        collision = self._check_collision()
-        if collision:
-            self.collision_count += 1
+            # 检查碰撞
+            collision = self._check_collision()
+            if collision:
+                self.collision_count += 1
 
-        # 检查是否到达目标
-        reached_target = self._check_target_reached()
+            # 检查是否到达目标
+            reached_target = self._check_target_reached()
 
-        # 检查是否超出边界
-        out_of_bounds = self._check_out_of_bounds()
+            # 检查是否超出边界
+            out_of_bounds = self._check_out_of_bounds()
 
-        # 计算奖励
-        reward = self._calculate_reward(collision, reached_target, out_of_bounds)
+            # 计算奖励
+            reward = self._calculate_reward(collision, reached_target, out_of_bounds)
 
-        # 判断是否结束
-        done = collision or reached_target or out_of_bounds or \
-               self.step_count >= self.max_steps
+            # 判断是否结束
+            done = collision or reached_target or out_of_bounds or \
+                   self.step_count >= self.max_steps
 
-        # 更新深度图缓冲
-        depth_image = self._generate_depth_image()
-        self.depth_buffer.append(depth_image)
+            # 更新深度图缓冲
+            depth_image = self._generate_depth_image()
+            self.depth_buffer.append(depth_image)
 
-        # 更新前一步距离
-        self.prev_distance = self._get_distance_to_target()
+            # 更新前一步距离
+            self.prev_distance = self._get_distance_to_target()
 
-        # 获取下一状态
-        next_state = self._get_state()
+            # 获取下一状态
+            next_state = self._get_state()
 
-        # 构建信息字典
-        info = {
-            'collision': collision,
-            'reached_target': reached_target,
-            'out_of_bounds': out_of_bounds,
-            'step_count': self.step_count,
-            'distance_to_target': self._get_distance_to_target(),
-            'collision_count': self.collision_count,
-            'energy_consumed': self.rover.total_energy,
-            'dynamics_features': self.get_dynamics_features(),
-        }
+            # 构建信息字典
+            info = {
+                'collision': collision,
+                'reached_target': reached_target,
+                'out_of_bounds': out_of_bounds,
+                'step_count': self.step_count,
+                'distance_to_target': self._get_distance_to_target(),
+                'collision_count': self.collision_count,
+                'energy_consumed': self.rover.total_energy,
+                'dynamics_features': self.get_dynamics_features(),
+            }
 
-        return next_state, reward, done, info
+            return next_state, reward, done, info
+        except Exception as e:
+            print(f"执行动作时出错: {e}")
+            # 返回默认值
+            next_state = self._get_state()
+            reward = config.REWARD_COLLISION
+            done = True
+            info = {
+                'collision': False,
+                'reached_target': False,
+                'out_of_bounds': False,
+                'step_count': self.step_count,
+                'distance_to_target': self._get_distance_to_target(),
+                'collision_count': self.collision_count,
+                'energy_consumed': self.rover.total_energy,
+                'dynamics_features': self.get_dynamics_features(),
+                'error': str(e),
+            }
+            return next_state, reward, done, info
 
     def _get_state(self) -> np.ndarray:
         """
@@ -874,19 +964,23 @@ class LunarEnvironment:
         - 主要依靠终止奖励和进度奖励
         - 添加障碍物接近惩罚，提供持续避障信号
         - 降低碰撞惩罚，减少经验分布偏斜
+        - 加入能耗惩罚，鼓励低能耗路径
 
         奖励组件：
         - 到达目标：+500 + 时间奖励
         - 碰撞/出界：-50（降低以减少PER偏差）
         - 进度奖励：靠近目标得正奖励
         - 障碍物接近惩罚：距离越近惩罚越大（持续信号）
+        - 能耗惩罚：基于第四章的能耗模型
         - 每步小惩罚：-0.1（鼓励快速完成）
         """
         # 1. 终止条件奖励
         if reached_target:
             # 时间奖励：越快到达奖励越高
             time_bonus = max(0, (self.max_steps - self.step_count) / self.max_steps * 200)
-            return config.REWARD_GOAL_REACHED + time_bonus
+            # 能耗奖励：能耗越低奖励越高
+            energy_bonus = max(0, (1000 - self.rover.total_energy) / 1000 * 100)
+            return config.REWARD_GOAL_REACHED + time_bonus + energy_bonus
 
         if collision or out_of_bounds:
             return config.REWARD_COLLISION
@@ -908,7 +1002,16 @@ class LunarEnvironment:
             proximity_penalty = (1.0 - min_obstacle_dist / config.OBSTACLE_DANGER_DISTANCE)
             reward += proximity_penalty * config.REWARD_OBSTACLE_PROXIMITY_WEIGHT
 
-        # 4. 每步小惩罚（鼓励快速到达，但不要太大以免淹没进度信号）
+        # 4. 能耗惩罚（基于第四章的能耗模型）
+        # 计算每步能耗增量
+        if self.step_count > 0:
+            # 假设初始能耗为0，计算当前步的能耗增量
+            energy_increment = self.rover.total_energy / self.step_count if self.step_count > 0 else 0
+            # 能耗惩罚：能耗越高惩罚越大
+            energy_penalty = energy_increment * 0.01  # 能耗权重
+            reward -= energy_penalty
+
+        # 5. 每步小惩罚（鼓励快速到达，但不要太大以免淹没进度信号）
         reward += config.REWARD_TIME_STEP
 
         return reward

@@ -5,6 +5,7 @@ A*算法模块 - 静态全局路径规划
 """
 
 import heapq
+import math
 import numpy as np
 from typing import List, Tuple, Optional, Set
 from config import config
@@ -190,13 +191,15 @@ class AStarPlanner:
                             return new_pos
         return None
 
-    def find_path(self, start: Tuple[float, float], goal: Tuple[float, float]) -> Optional[List[Tuple[float, float]]]:
+    def find_path(self, start: Tuple[float, float], goal: Tuple[float, float], terrain_model=None) -> Optional[List[Tuple[float, float]]]:
         """
-        使用A*算法寻找从起点到目标的最短路径
+        使用A*算法寻找从起点到目标的最优路径
+        考虑距离和能耗因素
 
         Args:
             start: 起点世界坐标 (x, y)
             goal: 目标世界坐标 (x, y)
+            terrain_model: 地形模型，用于计算能耗
 
         Returns:
             路径点列表（世界坐标），如果找不到路径则返回None
@@ -254,7 +257,40 @@ class AStarPlanner:
                 neighbor_node = Node(neighbor_pos, current_node)
 
                 # 计算g值（从起点到邻居的实际代价）
-                neighbor_node.g = current_node.g + move_cost
+                # 基础代价：距离
+                distance_cost = move_cost
+                
+                # 能耗代价（如果有地形模型）
+                energy_cost = 0.0
+                if terrain_model:
+                    # 将栅格坐标转换为世界坐标
+                    current_world = self.grid_to_world(current_node.position)
+                    neighbor_world = self.grid_to_world(neighbor_pos)
+                    
+                    # 计算移动方向和距离
+                    dx = neighbor_world[0] - current_world[0]
+                    dy = neighbor_world[1] - current_world[1]
+                    distance = math.sqrt(dx*dx + dy*dy)
+                    
+                    # 计算地形可通行性
+                    terrain_features = {'soil_type': 'loose_soil'}  # 简化处理，实际应根据位置获取
+                    traversability = terrain_model.calculate_traversability(terrain_features)
+                    
+                    # 计算能耗（基于第四章的能耗模型）
+                    normal_load = 140.0 * 1.62 / 6  # 月球车质量140kg，月球重力1.62m/s²，6个车轮
+                    sinkage = terrain_model.calculate_sinkage(normal_load)
+                    slip_ratio = 0.05 * (1 - traversability)
+                    rolling_resistance = terrain_model.calculate_rolling_resistance(normal_load, slip_ratio)
+                    traction = rolling_resistance
+                    velocity = 0.3 * traversability  # 基于可通行性的速度
+                    
+                    # 使用第四章的功率消耗公式
+                    power = terrain_model.calculate_power_consumption(traction, velocity, rolling_resistance)
+                    energy_cost = power * (distance / velocity) if velocity > 0 else 0
+                
+                # 总代价：距离 + 能耗权重 * 能耗
+                total_cost = distance_cost + 0.1 * energy_cost
+                neighbor_node.g = current_node.g + total_cost
 
                 # 计算h值（从邻居到目标的启发式估计）
                 neighbor_node.h = self.heuristic(neighbor_pos, goal_grid)

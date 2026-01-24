@@ -30,6 +30,17 @@ class EnvironmentModeling:
         self.obstacle_map = np.zeros((self.map_height, self.map_width))
         self.traversability_map = np.ones((self.map_height, self.map_width))
         
+        # 定义月面典型地貌的物理参数 (基于Bekker理论)
+        self.soil_properties_db = {
+            0: {'name': 'Soft Regolith', 'kc': 1.4e3, 'kphi': 8.2e5, 'n': 1.0, 'c': 0.17e3, 'phi': 30}, # 松软月壤
+            1: {'name': 'Firm Soil',     'kc': 2.9e4, 'kphi': 1.5e6, 'n': 1.0, 'c': 1.1e3,  'phi': 35}, # 压实月壤
+            2: {'name': 'Rock',          'kc': 1e8,   'kphi': 1e8,   'n': 0.5, 'c': 1e5,    'phi': 45}  # 岩石
+        }
+        
+        # 新增：物理属性地图层 (Physics Layer)
+        # 存储每个网格的 [kc, kphi, n, c, phi]
+        self.physics_map = np.zeros((self.map_height, self.map_width, 5))
+        
         # 障碍物列表
         self.obstacles = []
         
@@ -102,6 +113,18 @@ class EnvironmentModeling:
         rock_regions = np.where(semantic_segmentation == 2)
         if len(rock_regions[0]) > 0:
             print(f"检测到岩石区域: {len(rock_regions[0])} 像素")
+        
+        # 核心修改：将语义标签映射为物理参数
+        for label_id, props in self.soil_properties_db.items():
+            mask = (semantic_segmentation == label_id)
+            if np.any(mask):
+                # 将物理参数填入 physics_map
+                self.physics_map[mask, 0] = props['kc']      #  cohesive modulus
+                self.physics_map[mask, 1] = props['kphi']    #  frictional modulus
+                self.physics_map[mask, 2] = props['n']       #  sinkage exponent
+                self.physics_map[mask, 3] = props['c']       #  cohesion
+                self.physics_map[mask, 4] = props['phi']     #  internal friction angle
+                print(f"映射语义标签 {label_id} ({props['name']}) 到物理参数，影响像素数: {np.sum(mask)}")
     
     def _process_terrain_features(self, terrain_features):
         """
@@ -198,11 +221,48 @@ class EnvironmentModeling:
                  elevation_map=self.elevation_map,
                  obstacle_map=self.obstacle_map,
                  traversability_map=self.traversability_map,
+                 physics_map=self.physics_map,
                  obstacles=self.obstacles,
                  terrain_features=self.terrain_features,
                  map_resolution=self.map_resolution,
                  map_size=self.map_size)
         print(f"地图保存完成: {filename}")
+    
+    def get_physics_at(self, position):
+        """
+        获取指定位置的物理属性
+        
+        Args:
+            position: 位置坐标 [x, y, z]
+        
+        Returns:
+            物理属性字典
+        """
+        # 将世界坐标转换为地图坐标
+        map_x = int((position[0] + self.map_size[0]/2) / self.map_resolution)
+        map_y = int((position[1] + self.map_size[1]/2) / self.map_resolution)
+        
+        # 边界检查
+        if 0 <= map_x < self.map_width and 0 <= map_y < self.map_height:
+            # 获取物理参数
+            kc, kphi, n, c, phi = self.physics_map[map_y, map_x]
+            
+            # 如果没有映射到物理参数，返回默认值（压实月壤）
+            if kc == 0:
+                default_props = self.soil_properties_db[1]  # 压实月壤作为默认
+                return default_props
+            
+            # 返回物理属性字典
+            return {
+                'kc': kc,
+                'kphi': kphi,
+                'n': n,
+                'c': c,
+                'phi': phi
+            }
+        else:
+            # 位置超出地图范围，返回默认值
+            return self.soil_properties_db[1]
     
     def load_map(self, filename):
         """
@@ -216,6 +276,9 @@ class EnvironmentModeling:
             self.elevation_map = data['elevation_map']
             self.obstacle_map = data['obstacle_map']
             self.traversability_map = data['traversability_map']
+            # 加载物理属性地图
+            if 'physics_map' in data:
+                self.physics_map = data['physics_map']
             self.obstacles = data['obstacles'].tolist()
             self.terrain_features = data['terrain_features'].tolist()
             self.map_resolution = data['map_resolution']

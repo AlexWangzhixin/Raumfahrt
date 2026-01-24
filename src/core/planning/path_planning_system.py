@@ -6,6 +6,12 @@
 
 import numpy as np
 
+# 导入地面力学模型
+import sys
+sys.path.append('..')
+sys.path.append('../..')
+from src.models.environment.terramechanics import Terramechanics
+
 class PathPlanningSystem:
     """
     路径规划系统类
@@ -31,6 +37,9 @@ class PathPlanningSystem:
         self.params = default_params.copy()
         if planner_params:
             self.params.update(planner_params)
+        
+        # 初始化地面力学模型
+        self.terramechanics = Terramechanics()
         
         # 规划结果
         self.plan_result = {
@@ -294,35 +303,43 @@ class PathPlanningSystem:
         Returns:
             cost: 路径成本
         """
-        # 简化版本：成本包括路径长度和与障碍物的距离
-        cost = 0.0
-        
-        # 路径长度成本
-        length_cost = self._calculate_path_length(path)
-        cost += length_cost
-        
-        # 障碍物距离成本
-        if obstacles:
-            for point in path:
-                min_distance = float('inf')
-                for obstacle in obstacles:
-                    obs_pos = obstacle['position'][:2]
-                    dx = point[0] - obs_pos[0]
-                    dy = point[1] - obs_pos[1]
-                    distance = np.sqrt(dx*dx + dy*dy)
-                    min_distance = min(min_distance, distance)
-                
-                # 距离障碍物越近，成本越高
-                if min_distance < 5.0:
-                    cost += (5.0 - min_distance) * 10
-        
-        # 地形成本
+        # 使用地面力学模型计算路径成本
         if terrain_map:
-            # 简化的地形成本计算
+            # 计算能耗和通过性成本
+            cost, cost_details = self.terramechanics.calculate_path_cost(path, terrain_map, obstacles)
+            
+            # 更新规划结果中的成本详细信息
+            self.plan_result['cost_details'] = cost_details
+            
+            return cost
+        else:
+            # 简化版本：成本包括路径长度和与障碍物的距离
+            cost = 0.0
+            
+            # 路径长度成本
+            length_cost = self._calculate_path_length(path)
+            cost += length_cost
+            
+            # 障碍物距离成本
+            if obstacles:
+                for point in path:
+                    min_distance = float('inf')
+                    for obstacle in obstacles:
+                        obs_pos = obstacle['position'][:2]
+                        dx = point[0] - obs_pos[0]
+                        dy = point[1] - obs_pos[1]
+                        distance = np.sqrt(dx*dx + dy*dy)
+                        min_distance = min(min_distance, distance)
+                    
+                    # 距离障碍物越近，成本越高
+                    if min_distance < 5.0:
+                        cost += (5.0 - min_distance) * 10
+            
+            # 地形成本
             terrain_cost = len(path) * 0.1
             cost += terrain_cost
-        
-        return cost
+            
+            return cost
     
     def validate_path(self, path, obstacles=None, terrain_map=None):
         """

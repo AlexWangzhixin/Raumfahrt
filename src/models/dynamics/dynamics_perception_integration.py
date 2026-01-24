@@ -6,6 +6,121 @@
 
 import numpy as np
 
+class ParameterEstimator:
+    """
+    参数估计器类
+    基于感知数据在线辨识土壤参数
+    """
+    
+    def __init__(self):
+        """
+        初始化参数估计器
+        """
+        # 估计的土壤参数
+        self.estimated_soil_params = {
+            'kc': 2.9e4,      # cohesive modulus
+            'kphi': 1.5e6,    # frictional modulus
+            'n': 1.0,         # sinkage exponent
+            'c': 1.1e3,       # cohesion
+            'phi': 35         # internal friction angle
+        }
+        
+        # 参数更新率
+        self.learning_rate = 0.01
+        
+        # 历史滑移率
+        self.slip_history = []
+        
+        # 历史加速度
+        self.acceleration_history = []
+        
+        print("参数估计器初始化完成")
+    
+    def update_parameters(self, measured_acceleration, predicted_acceleration, wheel_speeds, vehicle_velocity, soil_props):
+        """
+        使用感知数据更新土壤参数
+        
+        Args:
+            measured_acceleration: 测量的加速度
+            predicted_acceleration: 预测的加速度
+            wheel_speeds: 车轮角速度
+            vehicle_velocity: 车辆速度
+            soil_props: 当前土壤参数
+        
+        Returns:
+            更新后的土壤参数
+        """
+        # 计算加速度误差
+        acc_error = measured_acceleration - predicted_acceleration
+        
+        # 计算滑移率
+        r = 0.25  # 车轮半径
+        theoretical_velocity = r * np.mean(wheel_speeds)
+        
+        if abs(theoretical_velocity) < 1e-6:
+            slip_ratio = 0.0
+        else:
+            slip_ratio = (theoretical_velocity - np.linalg.norm(vehicle_velocity)) / abs(theoretical_velocity)
+            slip_ratio = max(-1.0, min(1.0, slip_ratio))
+        
+        # 存储历史数据
+        self.slip_history.append(slip_ratio)
+        self.acceleration_history.append(measured_acceleration)
+        
+        # 限制历史数据长度
+        if len(self.slip_history) > 10:
+            self.slip_history.pop(0)
+        if len(self.acceleration_history) > 10:
+            self.acceleration_history.pop(0)
+        
+        # 基于误差更新土壤参数
+        # 这里使用简单的梯度下降方法
+        error_magnitude = np.linalg.norm(acc_error)
+        
+        if error_magnitude > 0.01:
+            # 调整摩擦角以适应实际加速度
+            self.estimated_soil_params['phi'] += self.learning_rate * np.sign(acc_error[0]) * error_magnitude
+            self.estimated_soil_params['phi'] = max(20, min(45, self.estimated_soil_params['phi']))  # 限制在合理范围内
+            
+            # 调整凝聚力
+            self.estimated_soil_params['c'] += self.learning_rate * np.sign(acc_error[0]) * error_magnitude * 10
+            self.estimated_soil_params['c'] = max(0, min(2000, self.estimated_soil_params['c']))  # 限制在合理范围内
+        
+        # 融合当前土壤参数和估计参数
+        for key in self.estimated_soil_params:
+            if key in soil_props:
+                self.estimated_soil_params[key] = 0.7 * self.estimated_soil_params[key] + 0.3 * soil_props[key]
+        
+        return self.estimated_soil_params
+    
+    def get_estimated_params(self):
+        """
+        获取估计的土壤参数
+        
+        Returns:
+            估计的土壤参数字典
+        """
+        return self.estimated_soil_params.copy()
+    
+    def detect_hazardous_terrain(self, slip_ratio):
+        """
+        检测危险地形
+        
+        Args:
+            slip_ratio: 滑移率
+        
+        Returns:
+            危险等级 (0-1)
+        """
+        if abs(slip_ratio) > 0.5:
+            return 1.0  # 高危险
+        elif abs(slip_ratio) > 0.3:
+            return 0.7  # 中等危险
+        elif abs(slip_ratio) > 0.1:
+            return 0.3  # 低危险
+        else:
+            return 0.0  # 安全
+
 class DynamicsPerceptionIntegration:
     """
     动力学与感知集成类
@@ -42,6 +157,12 @@ class DynamicsPerceptionIntegration:
         # 不确定性
         self.uncertainty = np.diag([0.1, 0.1, 0.1, 0.05, 0.05, 0.05])  # [x, y, z, roll, pitch, yaw]的不确定性
         
+        # 参数估计器
+        self.parameter_estimator = ParameterEstimator()
+        
+        # 估计的土壤参数
+        self.estimated_soil_params = self.parameter_estimator.estimated_soil_params.copy()
+        
         print("动力学与感知集成模块初始化完成")
     
     def reset(self, start_position):
@@ -66,13 +187,15 @@ class DynamicsPerceptionIntegration:
         
         print(f"动力学与感知集成模块重置完成，起始位置: {start_position}")
     
-    def step(self, wheel_commands, dt):
+    def step(self, wheel_commands, dt, measured_acceleration=None, soil_props=None):
         """
         执行集成模块一步
         
         Args:
             wheel_commands: 车轮控制命令
             dt: 时间步长
+            measured_acceleration: 测量的加速度（可选）
+            soil_props: 当前土壤参数（可选）
         
         Returns:
             integration_state: 集成状态
@@ -87,12 +210,42 @@ class DynamicsPerceptionIntegration:
         if self.perception_buffer:
             self._fuse_perception_data()
         
+        # 更新土壤参数（如果有测量数据）
+        if measured_acceleration is not None and soil_props is not None:
+            # 计算预测的加速度
+            predicted_acceleration = np.array([0.0, 0.0, 0.0])  # 简化处理，实际应该从动力学模型获取
+            
+            # 更新土壤参数
+            self.estimated_soil_params = self.parameter_estimator.update_parameters(
+                measured_acceleration, 
+                predicted_acceleration, 
+                wheel_commands, 
+                self.state_estimate['velocity'],
+                soil_props
+            )
+        
+        # 计算当前滑移率
+        r = 0.25  # 车轮半径
+        theoretical_velocity = r * np.mean(wheel_commands)
+        
+        if abs(theoretical_velocity) < 1e-6:
+            current_slip_ratio = 0.0
+        else:
+            current_slip_ratio = (theoretical_velocity - np.linalg.norm(self.state_estimate['velocity'])) / abs(theoretical_velocity)
+            current_slip_ratio = max(-1.0, min(1.0, current_slip_ratio))
+        
+        # 检测危险地形
+        hazard_level = self.parameter_estimator.detect_hazardous_terrain(current_slip_ratio)
+        
         # 构建集成状态
         integration_state = {
             'state_estimate': self.state_estimate.copy(),
             'predicted_state': self.predicted_state.copy(),
             'uncertainty': self.uncertainty.copy(),
             'perception_buffer_size': len(self.perception_buffer),
+            'estimated_soil_params': self.estimated_soil_params.copy(),
+            'slip_ratio': current_slip_ratio,
+            'hazard_level': hazard_level,
         }
         
         return integration_state
@@ -107,8 +260,8 @@ class DynamicsPerceptionIntegration:
         """
         # 简化的状态预测
         # 基于车轮命令计算速度
-        left_speed = np.mean(wheel_commands[[0, 2, 4, 6]])
-        right_speed = np.mean(wheel_commands[[1, 3, 5, 7]])
+        left_speed = np.mean(wheel_commands[[0, 2, 4]])
+        right_speed = np.mean(wheel_commands[[1, 3, 5]])
         
         # 假设车轮半径为0.25m
         wheel_radius = 0.25
@@ -280,3 +433,95 @@ class DynamicsPerceptionIntegration:
             self.perception_buffer = original_buffer
         
         return predicted_states
+    
+    def get_dynamics_features_for_perception(self):
+        """
+        获取动力学特征，用于感知系统
+        
+        Returns:
+            动力学特征字典
+        """
+        return {
+            'position': self.state_estimate['position'].tolist(),
+            'velocity': self.state_estimate['velocity'].tolist(),
+            'orientation': self.state_estimate['orientation'].tolist(),
+            'angular_velocity': self.state_estimate['angular_velocity'].tolist(),
+            'uncertainty': self.uncertainty.tolist(),
+        }
+    
+    def get_environment_context(self):
+        """
+        获取环境上下文信息
+        
+        Returns:
+            环境上下文字典
+        """
+        return {
+            'predicted_state': {
+                'position': self.predicted_state['position'].tolist(),
+                'velocity': self.predicted_state['velocity'].tolist(),
+            },
+            'uncertainty': self.uncertainty.tolist(),
+        }
+    
+    def get_camera_pose(self):
+        """
+        获取相机姿态信息
+        
+        Returns:
+            相机姿态字典
+        """
+        return {
+            'position': self.state_estimate['position'].tolist(),
+            'orientation': self.state_estimate['orientation'].tolist(),
+        }
+    
+    def get_terrain_perception_aids(self):
+        """
+        获取地形感知辅助信息
+        
+        Returns:
+            地形感知辅助信息字典
+        """
+        return {
+            'state_estimate': self.state_estimate.copy(),
+            'predicted_state': self.predicted_state.copy(),
+        }
+    
+    def get_navigation_features(self):
+        """
+        获取导航系统所需的特征
+        
+        Returns:
+            导航特征字典
+        """
+        return {
+            'position': self.state_estimate['position'].tolist(),
+            'velocity': self.state_estimate['velocity'].tolist(),
+            'orientation': self.state_estimate['orientation'].tolist(),
+        }
+    
+    def calculate_motion_compensation(self):
+        """
+        计算运动补偿参数
+        
+        Returns:
+            运动补偿参数字典
+        """
+        return {
+            'velocity': self.state_estimate['velocity'].tolist(),
+            'angular_velocity': self.state_estimate['angular_velocity'].tolist(),
+        }
+    
+    def get_collision_risk(self, obstacles):
+        """
+        计算碰撞风险
+        
+        Args:
+            obstacles: 障碍物列表
+        
+        Returns:
+            带有碰撞风险的障碍物列表
+        """
+        # 简化的碰撞风险计算
+        return obstacles
