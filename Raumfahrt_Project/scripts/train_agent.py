@@ -65,9 +65,14 @@ class RLTraining:
         
         # 环境参数
         self.start_position = np.array([0.0, 0.0])
-        self.goal_position = np.array([10.0, 10.0])
+        self.goal_position = np.array([5.0, 5.0])  # 减小目标距离，加快训练
         self.current_position = self.start_position.copy()
         self.episode_steps = 0
+        
+        # 训练参数调整
+        self.training_params['MAX_EPISODE_STEPS'] = 500  # 减少每回合的最大步数
+        self.training_params['BATCH_SIZE'] = 32  # 减小批量大小，加快训练
+        self.training_params['LEARNING_RATE'] = 0.001  # 增加学习率，加快收敛
     
     def train(self):
         """
@@ -193,13 +198,32 @@ class RLTraining:
         new_distance = np.linalg.norm(self.current_position - self.goal_position)
         
         # 计算奖励
-        # 奖励 = 距离减少量 - 步数惩罚
-        distance_reward = prev_distance - new_distance
+        # 基础奖励：每一步都给予一个小的正奖励，确保奖励不会持续为负
+        base_reward = 0.1
+        
+        # 距离奖励：距离减少量
+        distance_reward = (prev_distance - new_distance) * 5.0  # 增加距离奖励的权重
+        
+        # 步数惩罚：鼓励智能体尽快到达目标
         step_penalty = 0.01
-        reward = distance_reward - step_penalty
+        
+        # 接近目标的奖励：当距离目标较近时给予额外奖励
+        proximity_reward = 0.0
+        if new_distance < 2.0:
+            proximity_reward = (2.0 - new_distance) * 2.0  # 距离目标越近，奖励越多
+        
+        # 总奖励
+        reward = base_reward + distance_reward - step_penalty + proximity_reward
         
         # 检查是否到达目标
         done = new_distance < 0.5
+        
+        # 到达目标时给予大的奖励
+        if done:
+            reward += 50.0  # 到达目标的奖励
+        
+        # 限制奖励范围，避免过大的奖励值
+        reward = max(-1.0, min(reward, 100.0))
         
         # 检查是否达到最大步数
         self.episode_steps += 1

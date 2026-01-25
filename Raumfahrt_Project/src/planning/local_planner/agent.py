@@ -264,21 +264,21 @@ class D3QNAgent:
         if self.use_per:
             (states, actions, rewards, next_states, dones,
              additional_features, next_additional_features,
-             weights, indices) = self.replay_buffer.sample(64)  # BATCH_SIZE
+             weights, indices) = self.replay_buffer.sample(32)  # 使用更小的批量大小，加快训练
             weights = torch.FloatTensor(weights).to(self.device)
         else:
             (states, actions, rewards, next_states, dones,
              additional_features, next_additional_features) = \
-                self.replay_buffer.sample(64)
+                self.replay_buffer.sample(32)  # 使用更小的批量大小，加快训练
             weights = None
             indices = None
 
-        # 转换为张量
-        states = torch.FloatTensor(states).to(self.device)
-        actions = torch.LongTensor(actions).to(self.device)
-        rewards = torch.FloatTensor(rewards).to(self.device)
-        next_states = torch.FloatTensor(next_states).to(self.device)
-        dones = torch.FloatTensor(dones).to(self.device)
+        # 转换为张量（优化方式）
+        states = torch.FloatTensor(np.array(states)).to(self.device)
+        actions = torch.LongTensor(np.array(actions)).to(self.device)
+        rewards = torch.FloatTensor(np.array(rewards)).to(self.device)
+        next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
+        dones = torch.FloatTensor(np.array(dones)).to(self.device)
 
         # 转换additional_features为张量
         if additional_features is not None and additional_features[0] is not None:
