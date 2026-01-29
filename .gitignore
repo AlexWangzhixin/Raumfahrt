@@ -1,17 +1,18 @@
 # Ignore doc files
 docs/
 
-# Ignore data files
-data/
-outputs/
-
 # Ignore large files
-torch_*.dll
-torch_*.lib
-cv2.pyd
-opencv_*.dll
 *.docx
 *.pdf
+*.tiff
+*.tif
+*.png
+*.jpg
+*.jpeg
+
+# Ignore data directories
+data/
+outputs/
 
 # Ignore other files
 .vscode/
@@ -48,3 +49,6 @@ dist/
 coverage/
 .tox/
 
+# Ignore temporary files
+*.tmp
+*.temp
