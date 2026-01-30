@@ -1,0 +1,16 @@
+seed: 20260130
+experiment_name: ch5_planning
+output_root: outputs/runs
+run_id: auto
+
+environment:
+  map_resolution: 0.1
+  map_size: [50.0, 50.0]
+  use_random_semantics: true
+  elevation:
+    slope_x: 0.0
+    slope_y: 0.0
+    noise_std: 0.0
+
+planning:
+  obstacle_threshold: 0.5

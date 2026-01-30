@@ -61,7 +61,7 @@ def generate_smooth_straight_line(start_pos, end_pos, duration=10.0, fps=30, eas
     return np.array(trajectory)
 
 
-def test_trajectory_generation():
+def run_trajectory_generation():
     """
     测试轨迹生成功能
     """
@@ -179,7 +179,7 @@ def main():
     主函数
     """
     try:
-        trajectory = test_trajectory_generation()
+        trajectory = run_trajectory_generation()
         print("\n=== 测试完成 ===")
         print("轨迹生成成功！")
         return trajectory

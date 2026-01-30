@@ -49,7 +49,14 @@ class TestTrajectoryGenerator(unittest.TestCase):
         
         # 验证轨迹形状
         self.assertIsInstance(trajectory, np.ndarray)
-        self.assertEqual(len(trajectory), int(self.duration * self.fps))
+        # 轨迹生成器会根据最大速度调整时长
+        path_length = np.sqrt(
+            (self.end_pos[0] - self.start_pos[0]) ** 2 +
+            (self.end_pos[1] - self.start_pos[1]) ** 2
+        )
+        min_duration = path_length / 0.5
+        expected_frames = int(max(self.duration, min_duration) * self.fps)
+        self.assertEqual(len(trajectory), expected_frames)
         self.assertEqual(trajectory.shape[1], 2)
         
         # 验证起点和终点

@@ -1,0 +1,9 @@
+seed: 20260130
+experiment_name: ch3_environment
+output_root: outputs/runs
+run_id: auto
+
+environment:
+  map_resolution: 0.1
+  map_size: [50.0, 50.0]
+  use_random_semantics: true

@@ -112,6 +112,36 @@ Raumfahrt_Project/
 
 ### 运行示例
 
+#### 0. 构建第三章环境地图
+```bash
+python scripts/experiments/ch3_build_environment.py --config configs/ch3_environment.yaml
+```
+输出目录：`outputs/runs/ch3_environment/<run_id>/environment/environment_maps.npz`
+
+#### 0.1 运行感知特征提取（Perception）
+```bash
+python scripts/experiments/perception_extract_features.py --config configs/perception.yaml
+```
+输出目录：`outputs/runs/perception/<run_id>/perception/perception_features.npz`
+
+#### 0.2 运行第四章动力学仿真
+```bash
+python scripts/experiments/ch4_run_dynamics.py --config configs/ch4_dynamics.yaml
+```
+输出目录：`outputs/runs/ch4_dynamics/<run_id>/dynamics/dynamics_results.npz`
+
+#### 0.3 运行第五章全局规划
+```bash
+python scripts/experiments/ch5_run_planning.py --config configs/ch5_planning.yaml
+```
+输出目录：`outputs/runs/ch5_planning/<run_id>/planning/planning_path.npz`
+
+#### 0.4 运行端到端闭环
+```bash
+python scripts/run_end_to_end.py --config configs/end_to_end.yaml
+```
+输出目录：`outputs/runs/end_to_end/<run_id>/summary.json`
+
 #### 1. 运行数字孪生仿真
 ```bash
 python scripts/run_digital_twin.py
@@ -170,6 +200,9 @@ python -m pytest tests/test_dynamics.py
 ### 论文相关
 - **docs/thesis/**：博士论文各章节草稿
 - **docs/plan/**：完善计划和答辩问题反馈
+
+### 实验说明
+- **docs/EXPERIMENTS.md**：可复现实验流程与端到端运行说明
 
 ### 代码文档
 - **docs/api/**：自动生成的API文档
