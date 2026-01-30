@@ -8,6 +8,7 @@ environment:
   map_size: [50.0, 50.0]
   use_random_semantics: true
   elevation:
+    source: ../data/dtm/NAC_DTM_CHANGE4.tiff
     slope_x: 0.0
     slope_y: 0.0
     noise_std: 0.0

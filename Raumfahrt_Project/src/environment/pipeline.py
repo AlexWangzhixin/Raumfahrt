@@ -59,6 +59,29 @@ def _generate_elevation_map(height: int, width: int, rng: np.random.Generator, s
         elevation += rng.normal(0.0, noise_std, size=(height, width))
     return elevation.astype(float)
 
+def _load_elevation_source(path: str, target_shape: tuple[int, int] | None = None) -> np.ndarray:
+    from PIL import Image
+
+    Image.MAX_IMAGE_PIXELS = None
+    with Image.open(path) as img:
+        elevation = np.array(img)
+
+    if elevation.ndim == 3:
+        elevation = elevation[:, :, 0]
+
+    elevation = elevation.astype(float)
+    valid_mask = np.isfinite(elevation) & (elevation > -1e30) & (elevation < 1e30)
+    if not np.all(valid_mask):
+        mean_val = float(np.mean(elevation[valid_mask])) if np.any(valid_mask) else 0.0
+        elevation = np.where(valid_mask, elevation, mean_val)
+
+    if target_shape is not None and elevation.shape != target_shape:
+        target_h, target_w = target_shape
+        resized = Image.fromarray(elevation).resize((target_w, target_h), resample=Image.BILINEAR)
+        elevation = np.array(resized).astype(float)
+
+    return elevation
+
 
 def build_environment(config: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(config, dict):
@@ -75,14 +98,25 @@ def build_environment(config: Dict[str, Any]) -> Dict[str, Any]:
     env_cfg = config.get("environment", {})
     map_resolution = float(env_cfg.get("map_resolution", 0.1))
     map_size = env_cfg.get("map_size", [50.0, 50.0])
+    origin = env_cfg.get("origin")
     width = int(map_size[0] / map_resolution)
     height = int(map_size[1] / map_resolution)
 
     elevation_cfg = env_cfg.get("elevation", {})
+    source_path = elevation_cfg.get("source")
     slope_x = float(elevation_cfg.get("slope_x", 0.0))
     slope_y = float(elevation_cfg.get("slope_y", 0.0))
     noise_std = float(elevation_cfg.get("noise_std", 0.0))
-    elevation_map = _generate_elevation_map(height, width, rng, (slope_x, slope_y), noise_std)
+
+    if source_path:
+        source_path = os.path.expanduser(source_path)
+        if not os.path.isabs(source_path):
+            source_path = os.path.abspath(source_path)
+        if not os.path.isfile(source_path):
+            raise FileNotFoundError(f"Elevation source not found: {source_path}")
+        elevation_map = _load_elevation_source(source_path, target_shape=(height, width))
+    else:
+        elevation_map = _generate_elevation_map(height, width, rng, (slope_x, slope_y), noise_std)
     use_random_semantics = env_cfg.get("use_random_semantics", True)
     if use_random_semantics:
         semantic_map = _generate_semantic_map(height, width, rng)
@@ -95,17 +129,20 @@ def build_environment(config: Dict[str, Any]) -> Dict[str, Any]:
     traversability_map = _build_traversability_map(semantic_map, slope_map)
 
     artifact_path = os.path.join(output_dir, "environment_maps.npz")
-    np.savez(
-        artifact_path,
-        elevation_map=elevation_map,
-        semantic_map=semantic_map,
-        physics_map=physics_map,
-        traversability_map=traversability_map,
-        obstacles=[],
-        terrain_features=[],
-        map_resolution=map_resolution,
-        map_size=map_size,
-    )
+    save_payload = {
+        "elevation_map": elevation_map,
+        "semantic_map": semantic_map,
+        "physics_map": physics_map,
+        "traversability_map": traversability_map,
+        "obstacles": [],
+        "terrain_features": [],
+        "map_resolution": map_resolution,
+        "map_size": map_size,
+    }
+    if origin is not None:
+        save_payload["origin"] = origin
+
+    np.savez(artifact_path, **save_payload)
     metadata_path = os.path.join(output_dir, "metadata.json")
     with open(metadata_path, "w", encoding="utf-8") as f:
         json.dump(
@@ -113,7 +150,13 @@ def build_environment(config: Dict[str, Any]) -> Dict[str, Any]:
                 "map_resolution": map_resolution,
                 "map_size": map_size,
                 "seed": seed,
-                "elevation": {"slope_x": slope_x, "slope_y": slope_y, "noise_std": noise_std},
+                "elevation": {
+                    "slope_x": slope_x,
+                    "slope_y": slope_y,
+                    "noise_std": noise_std,
+                    "source": source_path,
+                },
+                "origin": origin,
                 "use_random_semantics": use_random_semantics,
             },
             f,

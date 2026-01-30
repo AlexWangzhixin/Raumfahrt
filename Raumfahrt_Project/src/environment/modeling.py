@@ -6,6 +6,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 class EnvironmentModeling:
     """
@@ -24,6 +25,7 @@ class EnvironmentModeling:
         self.map_size = map_size
         self.map_width = int(map_size[0] / map_resolution)
         self.map_height = int(map_size[1] / map_resolution)
+        self.origin = None
         
         # 初始化地图
         self.elevation_map = np.zeros((self.map_height, self.map_width))
@@ -260,15 +262,20 @@ class EnvironmentModeling:
         Args:
             filename: 保存文件名
         """
-        np.savez(filename,
-                 elevation_map=self.elevation_map,
-                 obstacle_map=self.obstacle_map,
-                 traversability_map=self.traversability_map,
-                 physics_map=self.physics_map,
-                 obstacles=self.obstacles,
-                 terrain_features=self.terrain_features,
-                 map_resolution=self.map_resolution,
-                 map_size=self.map_size)
+        save_payload = {
+            "elevation_map": self.elevation_map,
+            "obstacle_map": self.obstacle_map,
+            "traversability_map": self.traversability_map,
+            "physics_map": self.physics_map,
+            "obstacles": self.obstacles,
+            "terrain_features": self.terrain_features,
+            "map_resolution": self.map_resolution,
+            "map_size": self.map_size,
+        }
+        if self.origin is not None:
+            save_payload["origin"] = np.array([self.origin[0], self.origin[1]])
+
+        np.savez(filename, **save_payload)
         print(f"地图保存完成: {filename}")
     
     def get_physics_at(self, position):
@@ -282,8 +289,7 @@ class EnvironmentModeling:
             物理属性字典
         """
         # 将世界坐标转换为地图坐标
-        map_x = int((position[0] + self.map_size[0]/2) / self.map_resolution)
-        map_y = int((position[1] + self.map_size[1]/2) / self.map_resolution)
+        map_x, map_y = self._world_to_map(position[0], position[1])
         
         # 边界检查
         if 0 <= map_x < self.map_width and 0 <= map_y < self.map_height:
@@ -306,11 +312,67 @@ class EnvironmentModeling:
         else:
             # 位置超出地图范围，返回默认值
             return self.soil_properties_db[1]
+
+    def get_elevation(self, x, y, default=0.0):
+        """根据坐标获取高程值"""
+        map_x, map_y = self._world_to_map(x, y)
+
+        if 0 <= map_x < self.map_width and 0 <= map_y < self.map_height:
+            return float(self.elevation_map[map_y, map_x])
+        return float(default)
+
+    def load_elevation_from_tiff(self, path, map_resolution=1.0, normalize=False):
+        """
+        从TIFF高程图加载到环境模型
+
+        Args:
+            path: TIFF高程图路径
+            map_resolution: 像素对应的实际分辨率 (m/pixel)
+            normalize: 是否归一化到 [0, 1]
+        """
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"Elevation TIFF not found: {path}")
+
+        from PIL import Image
+
+        # 允许加载大图
+        Image.MAX_IMAGE_PIXELS = None
+        with Image.open(path) as img:
+            elevation = np.array(img)
+
+        # 若为多通道，取第一通道
+        if elevation.ndim == 3:
+            elevation = elevation[:, :, 0]
+
+        elevation = elevation.astype(float)
+        # Handle common NoData sentinels (e.g., -3.4028235e38 for float32)
+        valid_mask = np.isfinite(elevation) & (elevation > -1e30) & (elevation < 1e30)
+        if not np.all(valid_mask):
+            mean_val = float(np.mean(elevation[valid_mask])) if np.any(valid_mask) else 0.0
+            elevation = np.where(valid_mask, elevation, mean_val)
+
+        if normalize:
+            min_val = np.min(elevation)
+            max_val = np.max(elevation)
+            if max_val > min_val:
+                elevation = (elevation - min_val) / (max_val - min_val)
+
+        self.elevation_map = elevation
+        self.map_height, self.map_width = elevation.shape
+        self.map_resolution = float(map_resolution)
+        self.map_size = (self.map_width * self.map_resolution, self.map_height * self.map_resolution)
+        self.origin = (0.0, 0.0)
+
+        # 重新初始化依赖尺寸的图层
+        self.obstacle_map = np.zeros((self.map_height, self.map_width))
+        self.traversability_map = np.ones((self.map_height, self.map_width))
+        self.physics_map = np.zeros((self.map_height, self.map_width, 5))
+
+        print(f"高程图加载完成: {path}, size={self.elevation_map.shape}, resolution={self.map_resolution} m/pixel")
     
     def get_soil_property(self, x, y):
         """根据坐标获取土壤物理参数"""
-        map_x = int((x + self.map_size[0]/2) / self.map_resolution)
-        map_y = int((y + self.map_size[1]/2) / self.map_resolution)
+        map_x, map_y = self._world_to_map(x, y)
         
         # 边界检查
         if 0 <= map_x < self.map_width and 0 <= map_y < self.map_height:
@@ -321,6 +383,60 @@ class EnvironmentModeling:
             else:
                 return self.soil_database[0] # 月壤
         return self.soil_database[0] # 默认返回月壤
+
+    def set_origin(self, origin_x, origin_y):
+        """设置地图原点（世界坐标）"""
+        self.origin = (float(origin_x), float(origin_y))
+
+    def _world_to_map(self, x, y):
+        if self.origin is None:
+            map_x = int((x + self.map_size[0] / 2) / self.map_resolution)
+            map_y = int((y + self.map_size[1] / 2) / self.map_resolution)
+        else:
+            map_x = int((x - self.origin[0]) / self.map_resolution)
+            map_y = int((y - self.origin[1]) / self.map_resolution)
+        return map_x, map_y
+
+    def crop_to_bounds(self, min_x, min_y, max_x, max_y, target_resolution=None):
+        """
+        按世界坐标裁剪并可选重采样
+        """
+        if target_resolution is None:
+            target_resolution = self.map_resolution
+
+        # 若无原点，假定当前地图原点为 (0, 0)
+        origin_x, origin_y = self.origin if self.origin is not None else (0.0, 0.0)
+        x0 = int((min_x - origin_x) / self.map_resolution)
+        x1 = int((max_x - origin_x) / self.map_resolution)
+        y0 = int((min_y - origin_y) / self.map_resolution)
+        y1 = int((max_y - origin_y) / self.map_resolution)
+
+        x0 = max(0, min(self.map_width - 1, x0))
+        y0 = max(0, min(self.map_height - 1, y0))
+        x1 = max(x0 + 1, min(self.map_width, x1))
+        y1 = max(y0 + 1, min(self.map_height, y1))
+
+        elevation = self.elevation_map[y0:y1, x0:x1]
+
+        if abs(target_resolution - self.map_resolution) > 1e-9:
+            from PIL import Image
+
+            scale = self.map_resolution / target_resolution
+            new_w = max(1, int(elevation.shape[1] * scale))
+            new_h = max(1, int(elevation.shape[0] * scale))
+            resized = Image.fromarray(elevation).resize((new_w, new_h), resample=Image.BILINEAR)
+            elevation = np.array(resized).astype(float)
+
+        self.elevation_map = elevation
+        self.map_height, self.map_width = elevation.shape
+        self.map_resolution = float(target_resolution)
+        self.map_size = (self.map_width * self.map_resolution, self.map_height * self.map_resolution)
+
+        self.obstacle_map = np.zeros((self.map_height, self.map_width))
+        self.traversability_map = np.ones((self.map_height, self.map_width))
+        self.physics_map = np.zeros((self.map_height, self.map_width, 5))
+
+        self.set_origin(min_x, min_y)
     
     def generate_random_semantic_segmentation(self):
         """
@@ -380,8 +496,14 @@ class EnvironmentModeling:
                 self.physics_map = data['physics_map']
             self.obstacles = data['obstacles'].tolist()
             self.terrain_features = data['terrain_features'].tolist()
-            self.map_resolution = data['map_resolution']
-            self.map_size = data['map_size']
+            self.map_resolution = float(data['map_resolution'])
+            self.map_size = tuple(data['map_size'])
+            if 'origin' in data:
+                origin_val = data['origin']
+                try:
+                    self.origin = (float(origin_val[0]), float(origin_val[1]))
+                except Exception:
+                    self.origin = None
             
             # 更新地图尺寸
             self.map_width = self.elevation_map.shape[1]

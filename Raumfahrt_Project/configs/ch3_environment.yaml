@@ -7,3 +7,5 @@ environment:
   map_resolution: 0.1
   map_size: [50.0, 50.0]
   use_random_semantics: true
+  elevation:
+    source: ../data/dtm/NAC_DTM_CHANGE4.tiff

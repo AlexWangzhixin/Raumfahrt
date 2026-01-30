@@ -28,7 +28,7 @@ class TrajectoryGenerator:
         else:
             return 1 - pow(-2 * t + 2, 3) / 2
     
-    def generate_smooth_straight_line(self, start_pos, end_pos, duration=10.0, fps=30, max_velocity=0.5):
+    def generate_smooth_straight_line(self, start_pos, end_pos, duration=10.0, fps=30, max_velocity=0.5, include_yaw=False):
         """
         生成平滑直线运动轨迹 (无抖动，带缓动)
         
@@ -40,7 +40,7 @@ class TrajectoryGenerator:
             max_velocity (float): 最大速度 (m/s)，默认0.5 m/s（月球车实际速度）
             
         Returns:
-            np.array: 轨迹点数组，形状 [[x0, y0], [x1, y1], ...]
+            np.array: 轨迹点数组，形状 [[x0, y0], ...] 或 [[x0, y0, yaw0], ...]
         """
         # 1. 计算总帧数
         total_frames = int(duration * fps)
@@ -84,4 +84,19 @@ class TrajectoryGenerator:
         trajectory[0] = start_pos
         trajectory[-1] = end_pos
         
-        return trajectory
+        if not include_yaw:
+            return trajectory
+
+        # Compute yaw from local segment direction.
+        yaws = np.zeros(len(trajectory), dtype=float)
+        for i in range(len(trajectory) - 1):
+            dx = trajectory[i + 1, 0] - trajectory[i, 0]
+            dy = trajectory[i + 1, 1] - trajectory[i, 1]
+            if abs(dx) < 1e-9 and abs(dy) < 1e-9:
+                yaws[i] = yaws[i - 1] if i > 0 else 0.0
+            else:
+                yaws[i] = np.arctan2(dy, dx)
+        if len(trajectory) > 1:
+            yaws[-1] = yaws[-2]
+
+        return np.column_stack([trajectory, yaws])

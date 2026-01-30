@@ -1,0 +1,40 @@
+seed: 20260130
+dem_allow_download: true
+dem_selection: CE4
+dem_sources:
+  CE4:
+    local: ../data/dtm/NAC_DTM_CHANGE4.tiff
+  CE6_Map1:
+    local: ../data/datasets/ce6/Map1_DTM_0.03.tif
+    remote: https://zenodo.org/records/14934337/files/Map1_DTM_0.03.tif?download=1
+  CE6_Map2:
+    local: ../data/datasets/ce6/Map2_DTM_0.3.tif
+    remote: https://zenodo.org/records/14934337/files/Map2_DTM_0.3.tif?download=1
+  Yutu2:
+    local: ../data/dtm/NAC_DTM_CHANGE4.tiff
+
+dem:
+  source_resolution: 1.0
+  normalize: false
+  align:
+    mode: crop_to_path
+    margin: 20.0
+    target_resolution: 1.0
+
+inputs:
+  environment_artifact: outputs/runs/ch3_environment/<run_id>/environment/environment_maps.npz
+
+
+simulation:
+  start_pos: [100.0, 100.0]
+  end_pos: [100.0, 500.0]
+  duration: 100.0
+  fps: 50
+
+trajectory:
+  include_yaw: true
+
+control:
+  max_velocity: 0.5
+  kp_pos: 0.5
+  kp_yaw: 1.0
