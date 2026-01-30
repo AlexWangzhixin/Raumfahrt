@@ -9,6 +9,9 @@ docs/
 *.png
 *.jpg
 *.jpeg
+*.7z
+*.zip
+*.rar
 
 # Ignore data directories
 data/
@@ -52,3 +55,7 @@ coverage/
 # Ignore temporary files
 *.tmp
 *.temp
+
+# Ignore specific directories
+Graphite_Segmentation/
+Thesis_Project/
