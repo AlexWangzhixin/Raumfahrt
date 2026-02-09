@@ -48,11 +48,21 @@ def run_end_to_end(config: Dict[str, Any]) -> Dict[str, Any]:
         config.setdefault("dynamics", {})
         config["dynamics"]["start_pos"] = [float(path[0][0]), float(path[0][1])]
         config["dynamics"]["end_pos"] = [float(path[-1][0]), float(path[-1][1])]
+        if config["dynamics"].get("auto_duration"):
+            max_velocity = float(config["dynamics"].get("max_velocity", 0.5))
+            min_duration = float(config["dynamics"].get("min_duration", 0.0))
+            plan_meta = np.load(plan_result["artifact_path"])
+            path_length = float(plan_meta.get("path_length", 0.0))
+            if path_length > 0:
+                config["dynamics"]["duration"] = max(min_duration, path_length / max(max_velocity, 1e-6))
 
     dyn_cfg = dict(config)
     dyn_cfg["output_root"] = run_info["run_dir"]
     dyn_cfg["experiment_name"] = "dynamics"
-    dyn_cfg["inputs"] = {"environment_artifact": env_artifact}
+    dyn_cfg["inputs"] = {
+        "environment_artifact": env_artifact,
+        "planning_artifact": plan_result["artifact_path"],
+    }
     dyn_result = simulate_dynamics(dyn_cfg)
 
     summary = {
@@ -61,6 +71,22 @@ def run_end_to_end(config: Dict[str, Any]) -> Dict[str, Any]:
         "planning_artifact": plan_result["artifact_path"],
         "dynamics_artifact": dyn_result["artifact_path"],
     }
+    cesium_cfg = config.get("cesium", {})
+    if isinstance(cesium_cfg, dict) and cesium_cfg.get("enabled"):
+        from src.core.cesium_export import export_results_to_czml
+
+        output_dir = cesium_cfg.get("output_dir", os.path.join(run_info["run_dir"], "cesium"))
+        origin = cesium_cfg.get("origin", [0.0, 0.0, 0.0])
+        sample_step = int(cesium_cfg.get("sample_step", 5))
+        time_step = float(cesium_cfg.get("time_step", 1.0))
+        cesium_artifact = export_results_to_czml(
+            dyn_result["artifact_path"],
+            output_dir=output_dir,
+            origin=origin,
+            sample_step=sample_step,
+            time_step=time_step,
+        )
+        summary["cesium_artifact"] = cesium_artifact
     summary_path = os.path.join(run_info["run_dir"], "summary.json")
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)

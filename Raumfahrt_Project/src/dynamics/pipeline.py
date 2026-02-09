@@ -27,6 +27,41 @@ def _load_environment_model(env_artifact: str | None) -> EnvironmentModeling | N
     return None
 
 
+def _resample_path(path_xy: np.ndarray, duration: float, fps: int, max_velocity: float) -> np.ndarray:
+    if path_xy.shape[0] < 2:
+        return path_xy
+
+    # Build cumulative arc length
+    diffs = np.diff(path_xy, axis=0)
+    seg_lengths = np.sqrt(np.sum(diffs * diffs, axis=1))
+    total_length = float(np.sum(seg_lengths))
+    if total_length <= 1e-6:
+        return np.repeat(path_xy[:1], int(duration * fps), axis=0)
+
+    steps = max(2, int(duration * fps))
+    # If duration is too short for max_velocity, extend duration implicitly
+    min_duration = total_length / max(max_velocity, 1e-6)
+    if duration < min_duration:
+        steps = max(2, int(min_duration * fps))
+
+    target_s = np.linspace(0.0, total_length, steps)
+    cum_s = np.concatenate([[0.0], np.cumsum(seg_lengths)])
+
+    resampled = np.zeros((steps, 2), dtype=float)
+    seg_idx = 0
+    for i, s in enumerate(target_s):
+        while seg_idx < len(seg_lengths) - 1 and cum_s[seg_idx + 1] < s:
+            seg_idx += 1
+        s0 = cum_s[seg_idx]
+        s1 = cum_s[seg_idx + 1] if seg_idx + 1 < len(cum_s) else total_length
+        t = 0.0 if s1 <= s0 else (s - s0) / (s1 - s0)
+        p0 = path_xy[seg_idx]
+        p1 = path_xy[min(seg_idx + 1, path_xy.shape[0] - 1)]
+        resampled[i] = p0 + t * (p1 - p0)
+
+    return resampled
+
+
 def simulate_dynamics(config: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(config, dict):
         raise TypeError("config must be a dict")
@@ -42,14 +77,25 @@ def simulate_dynamics(config: Dict[str, Any]) -> Dict[str, Any]:
     duration = float(sim_cfg.get("duration", 100.0))
     fps = int(sim_cfg.get("fps", 50))
     max_velocity = float(sim_cfg.get("max_velocity", 0.5))
+    use_planning_path = bool(sim_cfg.get("use_planning_path", False))
 
     env_artifact = config.get("inputs", {}).get("environment_artifact")
     env_model = _load_environment_model(env_artifact)
 
-    generator = TrajectoryGenerator()
-    path = generator.generate_smooth_straight_line(
-        start_pos, end_pos, duration, fps, max_velocity=max_velocity
-    )
+    planning_artifact = config.get("inputs", {}).get("planning_artifact")
+    path = None
+    if use_planning_path and planning_artifact and os.path.isfile(planning_artifact):
+        data = np.load(planning_artifact, allow_pickle=True)
+        if "path" in data:
+            raw_path = np.array(data["path"], dtype=float)
+            if raw_path.ndim == 2 and raw_path.shape[1] >= 2:
+                path = _resample_path(raw_path[:, :2], duration, fps, max_velocity)
+
+    if path is None:
+        generator = TrajectoryGenerator()
+        path = generator.generate_smooth_straight_line(
+            start_pos, end_pos, duration, fps, max_velocity=max_velocity
+        )
 
     rover = LunarRoverDynamics(env_model=env_model)
     dt = 1.0 / fps
@@ -64,7 +110,8 @@ def simulate_dynamics(config: Dict[str, Any]) -> Dict[str, Any]:
         "target_position": [],
     }
 
-    initial_position = [path[0][0], path[0][1], 0.0]
+    initial_z = env_model.get_elevation(path[0][0], path[0][1]) if env_model else 0.0
+    initial_position = [path[0][0], path[0][1], initial_z]
     rover.reset(initial_position)
 
     for step in range(len(path)):

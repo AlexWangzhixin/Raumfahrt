@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Raumfahrt Cesium Viewer</title>
+    <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">Raumfahrt Cesium Viewer</div>
+        <div class="controls">
+          <input id="czmlPath" type="text" placeholder="path/to/path.czml" />
+          <button id="loadBtn">Load CZML</button>
+        </div>
+      </header>
+      <div id="cesiumContainer"></div>
+      <div class="hint">
+        Use query param: <code>?czml=outputs/visualizations/cesium/path.czml</code>
+      </div>
+    </div>
+
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
