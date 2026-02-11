@@ -489,15 +489,26 @@ class EnvironmentModeling:
         try:
             data = np.load(filename, allow_pickle=True)
             self.elevation_map = data['elevation_map']
-            self.obstacle_map = data['obstacle_map']
-            self.traversability_map = data['traversability_map']
+            if 'obstacle_map' in data:
+                self.obstacle_map = data['obstacle_map']
+            else:
+                self.obstacle_map = np.zeros_like(self.elevation_map, dtype=int)
+            if 'traversability_map' in data:
+                self.traversability_map = data['traversability_map']
+            else:
+                self.traversability_map = np.ones_like(self.elevation_map, dtype=float)
             # 加载物理属性地图
             if 'physics_map' in data:
                 self.physics_map = data['physics_map']
-            self.obstacles = data['obstacles'].tolist()
-            self.terrain_features = data['terrain_features'].tolist()
-            self.map_resolution = float(data['map_resolution'])
-            self.map_size = tuple(data['map_size'])
+            if 'semantic_map' in data:
+                self.semantic_map = data['semantic_map']
+            self.obstacles = data['obstacles'].tolist() if 'obstacles' in data else []
+            self.terrain_features = data['terrain_features'].tolist() if 'terrain_features' in data else []
+            self.map_resolution = float(data['map_resolution']) if 'map_resolution' in data else float(self.map_resolution)
+            if 'map_size' in data:
+                self.map_size = tuple(data['map_size'])
+            else:
+                self.map_size = (self.elevation_map.shape[1] * self.map_resolution, self.elevation_map.shape[0] * self.map_resolution)
             if 'origin' in data:
                 origin_val = data['origin']
                 try:

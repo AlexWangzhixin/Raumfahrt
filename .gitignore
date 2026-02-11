@@ -16,6 +16,11 @@ docs/
 # Ignore data directories
 data/
 outputs/
+output/
+test-results/
+
+# Ignore date-based directories
+2026-02-07/
 
 # Ignore other files
 .vscode/

@@ -70,6 +70,7 @@ TITLE_OVERRIDES: Dict[str, str] = {
     "图6-4": "五维奖励函数权重敏感性分析图",
     "图6-5": "通讯时延补偿效果对比图",
     "表3-1": "Apollo力学参数先验分布表",
+    "表3-5": "D3QN/D3QN-PER/A-D3QN-Opt性能对比表",
     "表4-1": "Apollo验证数据对比表",
     "表5-1": "SiaT-Hough与其他方法性能对比表",
     "表5-2": "避障策略风险评估参数表",
@@ -108,6 +109,7 @@ DATA_PRIORITY_IDS = {
     "图6-4",
     "图6-5",
     "表3-1",
+    "表3-5",
     "表4-1",
     "表5-1",
     "表5-2",
@@ -144,6 +146,21 @@ def norm_dash(text: str) -> str:
     return text.replace("—", "-").replace("－", "-")
 
 
+def canonical_doc_key(req_id: str, fallback_doc_key: str) -> str:
+    # 图M-x / 表M-x -> outline
+    body = req_id[1:]
+    if body.upper().startswith("M-"):
+        return "outline"
+    # 图2-X 也归第2章
+    m = re.match(r"^([0-9]+)-", body)
+    if not m:
+        return fallback_doc_key
+    chapter = int(m.group(1))
+    if 1 <= chapter <= 6:
+        return f"ch{chapter}"
+    return fallback_doc_key
+
+
 def discover_doc_files() -> Dict[str, Path]:
     files = [p for p in DOC_ROOT.iterdir() if p.is_file() and p.suffix.lower() == ".docx" and not p.name.startswith("~$")]
     out: Dict[str, Path] = {}
@@ -174,6 +191,23 @@ def infer_kind(req_id: str, title: str, excerpt: str) -> Tuple[str, str]:
     if "示意图" in text:
         return req_type, "schematic"
     return req_type, "other"
+
+
+def force_kind_for_priority(req_id: str, current_kind: str, title: str) -> str:
+    # 某些图在段落中与“流程图”关键词共现，需按编号强制纠偏
+    if req_id not in DATA_PRIORITY_IDS:
+        return current_kind
+    if req_id.startswith("表"):
+        return "table"
+    if "热力" in title or "风险图" in title:
+        return "heatmap"
+    if "曲线" in title or "对比" in title:
+        return "curve"
+    if "重建" in title or "分割" in title:
+        return "image_panel"
+    if "示意图" in title:
+        return "schematic"
+    return "other" if current_kind == "flowchart" else current_kind
 
 
 def extract_visual(text: str) -> List[str]:
@@ -238,6 +272,7 @@ def expected_data(req_id: str, kind: str) -> List[str]:
         "图5-4": ["DOM-031202-200_X1.tif", "DEM031202-200Img_X.tif"],
         "图6-3": ["DEM031202-200Img_X.tif"],
         "表6-1": ["ce4_easing_comparison_metrics.json"],
+        "表3-5": ["ce4_easing_comparison_metrics.json", "derived_algorithm_scaling"],
     }
     if req_id in mapping:
         return mapping[req_id]
@@ -269,9 +304,10 @@ def extract_requirements() -> List[Requirement]:
                 if not seg and i + 1 < len(pars):
                     seg = pars[i + 1][:220]
                 context = " ".join(pars[max(0, i - 1) : min(len(pars), i + 2)])
+                owner_key = canonical_doc_key(req_id, doc_key)
                 ent = by_key.setdefault(
-                    (doc_key, req_id),
-                    {"doc_key": doc_key, "doc_name": doc_path.name, "req_id": req_id, "segments": [], "contexts": []},
+                    (owner_key, req_id),
+                    {"doc_key": owner_key, "doc_name": docs.get(owner_key, doc_path).name, "req_id": req_id, "segments": [], "contexts": []},
                 )
                 if seg:
                     ent["segments"].append(seg)
@@ -291,6 +327,7 @@ def extract_requirements() -> List[Requirement]:
         title = TITLE_OVERRIDES.get(req_id, re.split(r"[。；;，,]", sorted(segs, key=len, reverse=True)[0])[0].strip())
         excerpt = sorted(ctxs, key=len, reverse=True)[0][:560]
         req_type, kind = infer_kind(req_id, title, excerpt)
+        kind = force_kind_for_priority(req_id, kind, title)
         reqs.append(
             Requirement(
                 doc_key=ent["doc_key"],
