@@ -1,0 +1,75 @@
+% !TeX program = lualatex
+% !TeX encoding = UTF-8
+% !BIB program = bibtex
+% 中文论文排版：使用 ctex（支持章节/中文标题/中文标点等）
+\documentclass[UTF8,zihao=-4,a4paper,oneside,openany]{ctexrep}
+
+% 快速编译开关：写作阶段建议保持 true（显著加速），定稿前改为 false
+\newif\iffastcompile
+\fastcompilefalse
+
+% 导入配置文件（统一加载宏包与格式）
+\input{setup/preamble}
+\input{setup/macros}
+
+\title{面向月面巡视器自主行走的数字孪生技术研究}
+\author{作者姓名}
+\date{\today}
+
+\begin{document}
+	
+	\maketitle
+	\iffastcompile
+	% 快速编译：跳过目录/图表目录（需要时再打开）
+	\else
+	\tableofcontents
+	\listoffigures
+	\listoftables
+	\fi
+	
+%	\input{chapters/1.绪论/1.1_研究背景及意义}
+%	\input{chapters/1.绪论/1.2_国内外研究现状}
+%	\input{chapters/1.绪论/1.3_现存难点及问题分析}
+%	\input{chapters/1.绪论/1.4_论文主要研究内容及章节安排}
+%	
+%	\input{chapters/2.基于增强五维模型的月面巡视器自主行走数字孪生框架/2.1_经典数字孪生五维模型适用性分析}
+%	\input{chapters/2.基于增强五维模型的月面巡视器自主行走数字孪生框架/2.2_面向月面巡视器自主行走的数字孪生增强五维模型}
+%	\input{chapters/2.基于增强五维模型的月面巡视器自主行走数字孪生框架/2.3_月面巡视器自主行走增强数字孪生总体架构}
+%	\input{chapters/2.基于增强五维模型的月面巡视器自主行走数字孪生框架/2.4_本章小结}
+%	
+%	\input{chapters/3.月面环境数字孪生建模与仿真/3.1_月面环境特点与建模需求}
+%	\input{chapters/3.月面环境数字孪生建模与仿真/3.2_月面地形数字孪生建模}
+%	\input{chapters/3.月面环境数字孪生建模与仿真/3.3_月壤环境数字孪生建模}
+%	\input{chapters/3.月面环境数字孪生建模与仿真/3.4_月面光照与温度环境仿真}
+%	\input{chapters/3.月面环境数字孪生建模与仿真/3.5_本章小结}
+%	
+%	\input{chapters/4.月面巡视器动力学数字孪生建模/4.1_巡视器动力学建模基础}
+%	\input{chapters/4.月面巡视器动力学数字孪生建模/4.2_多体动力学模型构建}
+%	\input{chapters/4.月面巡视器动力学数字孪生建模/4.3_动力学模型验证与校准}
+%	\input{chapters/4.月面巡视器动力学数字孪生建模/4.4_动力学数字孪生实时仿真}
+%	\input{chapters/4.月面巡视器动力学数字孪生建模/4.5_本章小结}
+	
+	\input{chapters/5.基于数字孪生的月面岩石识别与避障/5.1_月面岩石识别需求与挑战}
+	\input{chapters/5.基于数字孪生的月面岩石识别与避障/5.2_数字孪生平台下的岩石识别框架}
+	\input{chapters/5.基于数字孪生的月面岩石识别与避障/5.3_增强型ORB-SLAM2系统}
+	\input{chapters/5.基于数字孪生的月面岩石识别与避障/5.4_基于岩石识别的避障策略}
+	\input{chapters/5.基于数字孪生的月面岩石识别与避障/5.5_算法验证与性能分析}
+	
+	\input{chapters/6.基于数字孪生的巡视器路径规划/6.1_路径规划问题描述}
+	\input{chapters/6.基于数字孪生的巡视器路径规划/6.2_数字孪生环境下的路径规划框架}
+	\input{chapters/6.基于数字孪生的巡视器路径规划/6.3_基于A-D3QN的混合路径规划算法}
+	\input{chapters/6.基于数字孪生的巡视器路径规划/6.4_算法验证与性能分析}
+	
+	% \input{chapters/7.总结与展望/7.1_工作总结}
+	% \input{chapters/7.总结与展望/7.2_主要创新点}
+	% \input{chapters/7.总结与展望/7.3_研究展望}
+	
+	% 参考文献（临时：仅编译 3.1，不编译文末）
+	% \bibliographystyle{plain}
+	% \bibliography{bib/references}
+	
+	% 附录（临时：不编译）
+	% \appendix
+	% \input{appendix/appendix}
+	
+\end{document}

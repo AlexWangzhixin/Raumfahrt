@@ -1,0 +1,74 @@
+\section{数字孪生环境下的路径规划框架}
+\label{sec:ch6_framework}
+
+为满足第\ref{sec:ch6_problem}节定义的多约束优化目标，本文构建“环境建模-状态感知-决策优化-虚实校核”一体化路径规划框架。
+该框架由环境建模、规划决策与动力学校核模块协同实现。
+
+\begin{figure}[H]
+	\centering
+	\resizebox{0.88\textwidth}{!}{%
+	\begin{tikzpicture}[font=\small, >=Stealth]
+		\node[draw, rounded corners, align=left, text width=9.8cm, minimum height=1.25cm, inner sep=2.2mm, fill=blue!10] (l1) at (0,0) {\textbf{环境建模层：}融合地形高程、语义分区与物理参数，构建可通行性底图与风险先验。};
+		\node[draw, rounded corners, align=left, text width=9.8cm, minimum height=1.25cm, inner sep=2.2mm, fill=green!10] (l2) at (0,-1.9) {\textbf{状态感知层：}估计位姿与速度状态，整合动态障碍观测，形成统一状态向量。};
+		\node[draw, rounded corners, align=left, text width=9.8cm, minimum height=1.25cm, inner sep=2.2mm, fill=orange!14] (l3) at (0,-3.8) {\textbf{决策优化层：}以全局先验规划为骨架，结合局部策略优化输出可执行路径与动作序列。};
+		\node[draw, rounded corners, align=left, text width=9.8cm, minimum height=1.25cm, inner sep=2.2mm, fill=purple!10] (l4) at (0,-5.7) {\textbf{虚实校核层：}根据执行偏差触发重规划与参数回写，维持在线闭环一致性。};
+
+		\draw[->, thick, draw=black!75] (l1.south) -- (l2.north);
+		\draw[->, thick, draw=black!75] (l2.south) -- (l3.north);
+		\draw[->, thick, draw=black!75] (l3.south) -- (l4.north);
+
+		\node[draw, rounded corners, align=center, text width=2.7cm, minimum height=0.95cm, fill=cyan!12] (k1) at (7.0,-1.9) {状态一致性约束};
+		\node[draw, rounded corners, align=center, text width=2.7cm, minimum height=0.95cm, fill=yellow!16] (k2) at (7.0,-3.8) {风险阈值自适应};
+		\draw[->, thick, draw=black!75] (k1.west) -- (l2.east);
+		\draw[->, thick, draw=black!75] (k2.west) -- (l3.east);
+		\draw[->, thick, draw=blue!70!black] (l4.east) .. controls (6.3,-5.5) and (6.3,-2.3) .. node[right, align=center]{闭环反馈} (l2.east);
+	\end{tikzpicture}%
+	}
+	\caption{基于增强五维模型的分层路径规划框架}
+	\label{fig:ch6_dt_framework}
+\end{figure}
+
+图\ref{fig:ch6_dt_framework}按照“环境建模-状态感知-决策优化-虚实校核”四层组织规划流程，
+上层输出为下层提供约束与先验，下层反馈用于在线修正风险参数与重规划触发阈值，
+形成可迭代收敛的闭环规划机制。该分层设计将全局可达性、局部安全性与执行稳定性统一到同一系统结构中。
+
+\subsection{环境建模与状态感知一体化}
+\label{subsec:ch6_env_state}
+
+在环境建模层，系统将语义与可通行性映射为规划栅格：
+\begin{equation}
+G(x,y)=\mathbb{I}\!\left(M_{trav}(x,y)<\tau_{obs}\right),
+\label{eq:ch6_grid_from_trav}
+\end{equation}
+其中 $\tau_{obs}=0.5$。
+该映射通过统一接口完成，直接连接感知结果与全局规划求解器。
+
+状态估计遵循
+\begin{equation}
+\mathbf{x}_{k+1}=f(\mathbf{x}_k,\mathbf{u}_k,\mathbf{p}_k)+\mathbf{w}_k,\qquad
+\mathbf{z}_k=h(\mathbf{x}_k)+\mathbf{v}_k,
+\label{eq:ch6_state_observe}
+\end{equation}
+其中 $\mathbf{p}_k$ 为地形-土壤参数。
+通过孪生模型在线计算滑移与沉陷，可将“几何可通行”提升为“动力学可通行”。
+
+\subsection{决策优化闭环实现}
+\label{subsec:ch6_decision_loop}
+
+系统每个周期执行以下流程：
+\begin{myitemize}
+	\item 基于可通行性地图构建全局栅格并执行 A* 搜索；
+	\item 基于全局路径生成局部目标点，结合深度堆叠状态输入 D3QN 网络选择动作；
+	\item 动力学孪生执行一步预测，返回能耗、滑移、沉陷和跟踪残差；
+	\item 若偏离或风险超阈值，则触发局部重规划与阈值更新。
+\end{myitemize}
+
+该闭环可形式化为
+\begin{equation}
+\mathbf{u}_k=\Pi\!\left(\mathbf{x}_k,\mathcal{P}^{A*}_k,\mathcal{M}_{DT},\Theta_k\right),\quad
+\Theta_{k+1}=\Theta_k-\eta\nabla_{\Theta}\mathcal{L}_{track},
+\label{eq:ch6_closed_loop}
+\end{equation}
+其中 $\Theta_k$ 为策略参数，$\mathcal{L}_{track}$ 为轨迹跟踪损失。
+
+通过上述一体化框架，路径规划不再是静态离线求解，而是与感知和动力学联合演化的在线优化问题，为第\ref{sec:ch6_ad3qn}节混合算法奠定系统接口基础。

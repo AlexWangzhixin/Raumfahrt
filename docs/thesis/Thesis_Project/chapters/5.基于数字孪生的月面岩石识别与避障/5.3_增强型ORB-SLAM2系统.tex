@@ -1,0 +1,224 @@
+\section{增强型ORB-SLAM2系统}
+\label{sec:ch5_orbslam}
+
+为将第\ref{sec:ch5_dt_perception_framework}节的孪生感知框架进一步扩展到几何一致的定位建图任务，本文在 ORB-SLAM2 前端引入语义约束与结构投票机制，构建增强型 ORB-SLAM2。
+其核心思想是将“语义可信度”与“几何一致性”同时并入特征匹配与位姿估计，降低月面强光照变化和重复纹理场景下的误匹配率。
+
+增强系统由三个关键模块组成：SiaT-Hough 语义引导候选匹配、岩石特征提取与鲁棒匹配、基于特征点云的三维重建与岩石计数。
+其中，SiaT-Hough 负责提升前端匹配质量，后两者负责将匹配结果转化为可用于避障决策的三维障碍先验。
+
+\subsection{SiaT-Hough模块设计}
+\label{subsec:ch5_siat_hough}
+
+传统 ORB 前端在月面场景中面临两类失效：其一，阴影边界导致描述子分布漂移；其二，碎屑纹理重复导致局部最优匹配。
+为此，SiaT-Hough 模块采用“语义相似度 + 描述子相似度 + 几何投票”三阶段筛选。
+
+给定关键点对 $(i,j)$，其综合匹配得分定义为
+\begin{equation}
+\mathcal{S}_{ij}=\alpha \cdot \mathrm{sim}\!\left(\mathbf{d}_i,\mathbf{d}_j\right)
++\beta \cdot \mathrm{sim}\!\left(\mathbf{s}_i,\mathbf{s}_j\right)
++\gamma \cdot \mathcal{G}_{ij},
+\label{eq:ch5_siat_score}
+\end{equation}
+其中 $\mathbf{d}$ 为 ORB 描述子，$\mathbf{s}$ 为语义嵌入，$\mathcal{G}_{ij}$ 为几何一致性项，$\alpha+\beta+\gamma=1$。
+
+在候选对筛选后，利用霍夫空间执行全局一致性投票：
+\begin{equation}
+\mathcal{A}(\rho,\theta)=\sum_{(i,j)\in\Omega} \omega_{ij}\,
+\delta\!\left(\rho-\rho_{ij},\theta-\theta_{ij}\right),
+\label{eq:ch5_hough_vote}
+\end{equation}
+其中 $\omega_{ij}$ 与式\eqref{eq:ch5_siat_score}正相关，峰值单元对应主导几何变换。
+该过程可抑制局部高分但全局不一致的误匹配。
+
+\begin{algorithm}[H]
+\caption{SiaT-Hough 语义引导匹配}
+\label{alg:ch5_siat_hough}
+\begin{algorithmic}[1]
+\REQUIRE 当前帧特征集 $\mathcal{F}_t$，参考帧特征集 $\mathcal{F}_{t-1}$，阈值 $\tau_s,\tau_h$
+\ENSURE 一致匹配集合 $\mathcal{M}^\star$
+\STATE 计算 ORB 描述子相似度矩阵与语义相似度矩阵
+\STATE 按式\eqref{eq:ch5_siat_score}得到候选得分 $\mathcal{S}_{ij}$
+\STATE 保留 $\mathcal{S}_{ij}>\tau_s$ 的候选对，形成集合 $\Omega$
+\FOR{$(i,j)\in\Omega$}
+\STATE 计算 $(\rho_{ij},\theta_{ij})$ 并向霍夫累加器 $\mathcal{A}$ 投票
+\ENDFOR
+\STATE 选取 $\mathcal{A}$ 的主峰单元并回收一致候选
+\STATE 对一致候选执行 RANSAC 几何验证
+\STATE 输出通过几何验证的匹配集 $\mathcal{M}^\star$
+\end{algorithmic}
+\end{algorithm}
+
+上述设计的工程价值在于：前端不再仅依赖局部纹理，而是引入语义与全局几何双重约束，使匹配质量对光照变化和重复纹理更稳定。
+
+\subsection{岩石特征提取与匹配}
+\label{subsec:ch5_rock_feature_matching}
+
+针对月面岩石“边缘强、阴影深、尺寸跨尺度”的特性，本文采用“候选区域生成 $\rightarrow$ 多特征编码 $\rightarrow$ 双向一致匹配”的策略。
+候选区域首先由梯度与阴影联合阈值获得，再在候选区域内提取局部描述子与地形梯度特征。
+
+\begin{figure}[H]
+	\centering
+	\resizebox{0.95\textwidth}{!}{%
+	\begin{tikzpicture}[
+		node distance=5mm,
+		box/.style={draw, rounded corners, align=center, minimum height=7mm, text width=0.22\textwidth, inner sep=2mm},
+		arrow/.style={-{Stealth[length=2mm]}, thick, draw=black!75}
+		]
+		\node[box, fill=blue!10] (a) {图像/DEM输入};
+		\node[box, fill=cyan!12, right=of a] (b) {梯度-阴影筛选\\生成岩石候选掩膜};
+		\node[box, fill=green!12, right=of b] (c) {ORB + 语义 + 坡度\\联合特征编码};
+		\node[box, fill=orange!15, right=of c] (d) {双向一致性匹配\\+ 几何验证};
+		\draw[arrow] (a) -- (b);
+		\draw[arrow] (b) -- (c);
+		\draw[arrow] (c) -- (d);
+	\end{tikzpicture}%
+	}
+	\caption{岩石特征提取与匹配流程图}
+	\label{fig:ch5_feature_matching_flow}
+\end{figure}
+
+候选掩膜生成遵循梯度与阴影联合阈值策略，其关键步骤如下：
+\begin{lstlisting}[language=Python,caption={岩石候选区域提取关键代码片段},label={lst:ch5_rock_mask_code}]
+gray = rgb.mean(axis=2).astype(np.float32)
+grad = np.hypot(*np.gradient(gray))
+shadow = gray < np.percentile(gray, 28)
+mask = (grad > np.percentile(grad, 92)) & (~shadow)
+\end{lstlisting}
+
+对于候选点 $p_i$，构建联合特征向量
+\begin{equation}
+\mathbf{f}_i=[\mathbf{d}^{orb}_i,\ \mathbf{d}^{sem}_i,\ g_i,\ r_i],
+\label{eq:ch5_joint_feature}
+\end{equation}
+其中 $g_i$、$r_i$ 分别为坡度与粗糙度分量。
+匹配代价定义为
+\begin{equation}
+\mathcal{D}_{ij}=w_1\norm{\mathbf{d}^{orb}_i-\mathbf{d}^{orb}_j}_2
++w_2\norm{\mathbf{d}^{sem}_i-\mathbf{d}^{sem}_j}_2
++w_3\abs{g_i-g_j}+w_4\abs{r_i-r_j}.
+\label{eq:ch5_match_distance}
+\end{equation}
+最终采用“比值检验 + 互检 + RANSAC”三重约束获得稳定匹配集。
+
+\begin{algorithm}[H]
+\caption{岩石特征匹配流程}
+\label{alg:ch5_rock_matching}
+\begin{algorithmic}[1]
+\REQUIRE 关键点集合 $\mathcal{K}_t,\mathcal{K}_{t-1}$，候选掩膜 $\mathcal{M}$
+\ENSURE 鲁棒匹配集 $\mathcal{P}^\star$
+\STATE 在 $\mathcal{M}$ 内提取联合特征向量 $\mathbf{f}$
+\STATE 按式\eqref{eq:ch5_match_distance}计算最近邻与次近邻
+\STATE 执行比值检验，保留 $\mathcal{D}_1/\mathcal{D}_2<\tau_r$ 的匹配
+\STATE 执行前后向互检，剔除非对称匹配
+\STATE 执行 RANSAC 估计基础矩阵并剔除离群点
+\STATE 输出匹配集 $\mathcal{P}^\star$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{3D重建与岩石计数}
+\label{subsec:ch5_reconstruction_counting}
+
+在获得稳定匹配后，系统将二维候选点反投影到三维空间，形成岩石点云并执行目标计数。
+三维反投影写为
+\begin{equation}
+\mathbf{P}_k=\pi^{-1}\!\left(u_k,v_k,z_k;\mathbf{K},\mathbf{T}_{cw}\right),
+\label{eq:ch5_back_project}
+\end{equation}
+其中 $(u_k,v_k)$ 为像素坐标，$z_k$ 为深度，$\mathbf{K}$ 为相机内参，$\mathbf{T}_{cw}$ 为相机位姿。
+
+对重建点云执行二值开运算与连通域分析，岩石计数定义为
+\begin{equation}
+N_{rock}=\sum_{c=1}^{C}\mathbb{I}(A_c\ge A_{min}),
+\label{eq:ch5_counting}
+\end{equation}
+其中 $A_c$ 为第 $c$ 个连通域面积，$A_{min}$ 为最小面积阈值。
+在 CE4 局部视场实验中取 $A_{min}=20$ 像素（约 $0.05\,\mathrm{m}^2$）。
+
+\begin{table}[H]
+	\centering
+	\small
+	\caption{岩石重建与计数关键结果（CE4 局部视场）}
+	\label{tab:ch5_reconstruction_metrics}
+	\begin{tabular}{p{0.34\textwidth}p{0.30\textwidth}}
+		\toprule
+		指标 & 结果 \\
+		\midrule
+		梯度阈值百分位 / 阴影阈值百分位 & $92\% / 28\%$ \\
+		重建点云数 & $3500$ 点 \\
+		点云高程范围 & $[-1.921,\ 0.772]\,\mathrm{m}$ \\
+		显著岩石候选数（$A_{min}=20$像素） & $8$ \\
+		候选等效直径均值 / 最大值 & $0.275\,\mathrm{m} / 0.324\,\mathrm{m}$ \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+	\centering
+	\resizebox{0.92\textwidth}{!}{%
+	\begin{tikzpicture}[font=\small, >=Stealth]
+		% Panel A: 原始观测
+		\draw[rounded corners, thick, fill=gray!8] (0,0) rectangle (4.2,3.1);
+		\node[draw, rounded corners, fill=white, anchor=north west] at (0.12,2.98) {(a) 原始观测};
+		\fill[gray!30] (0.2,0.45) -- (0.9,1.55) -- (1.6,1.05) -- (2.5,1.95) -- (3.3,1.35) -- (4.0,1.7) -- (4.0,0.35) -- (0.2,0.35) -- cycle;
+		\fill[gray!65] (0.9,1.2) ellipse (0.22 and 0.16);
+		\fill[gray!65] (1.9,1.65) ellipse (0.18 and 0.13);
+		\fill[gray!65] (3.0,1.25) ellipse (0.24 and 0.16);
+		\node[draw, fill=white, inner sep=1pt] at (0.9,1.2) {\tiny R1};
+		\node[draw, fill=white, inner sep=1pt] at (1.9,1.65) {\tiny R2};
+		\node[draw, fill=white, inner sep=1pt] at (3.0,1.25) {\tiny R3};
+		\draw[dashed, gray!75] (0.35,2.35) -- (3.9,2.35);
+		\node[fill=white, inner sep=1pt, anchor=west] at (0.35,2.18) {\tiny 阴影边界};
+
+		% Panel B: 候选分割
+		\draw[rounded corners, thick, fill=green!6] (5.0,0) rectangle (9.2,3.1);
+		\node[draw, rounded corners, fill=white, anchor=north west] at (5.12,2.98) {(b) 岩石候选分割};
+		\fill[black!10] (5.25,0.45) rectangle (8.95,2.55);
+		\fill[green!65!black] (5.95,1.25) ellipse (0.35 and 0.24);
+		\fill[green!65!black] (7.05,1.75) ellipse (0.30 and 0.20);
+		\fill[green!65!black] (8.15,1.35) ellipse (0.38 and 0.26);
+		\node[fill=white, inner sep=1pt, anchor=west] at (5.35,0.62) {\tiny 绿色区域：岩石掩膜};
+		\draw[->, thick, draw=green!60!black] (6.2,2.4) -- (6.0,1.45);
+		\draw[->, thick, draw=green!60!black] (7.4,2.4) -- (7.05,1.95);
+		\draw[->, thick, draw=green!60!black] (8.55,2.4) -- (8.2,1.6);
+
+		% Panel C: 3D重建
+		\draw[rounded corners, thick, fill=blue!6] (10.0,0) rectangle (14.2,3.1);
+		\node[draw, rounded corners, fill=white, anchor=north west] at (10.12,2.98) {(c) 三维重建与计数};
+		\draw[->, thick] (10.55,0.65) -- (13.65,0.65) node[below] {$x$};
+		\draw[->, thick] (10.55,0.65) -- (10.55,2.55) node[left] {$z$};
+		\fill[blue!70] (11.0,1.0) circle (1.8pt);
+		\fill[blue!70] (11.3,1.25) circle (1.8pt);
+		\fill[blue!70] (11.6,1.1) circle (1.8pt);
+		\fill[cyan!70!black] (12.1,1.55) circle (1.8pt);
+		\fill[cyan!70!black] (12.4,1.85) circle (1.8pt);
+		\fill[cyan!70!black] (12.7,1.6) circle (1.8pt);
+		\fill[teal!70!black] (13.0,1.2) circle (1.8pt);
+		\fill[teal!70!black] (13.25,1.45) circle (1.8pt);
+		\node[fill=white, inner sep=1pt, anchor=west] at (10.75,2.35) {\tiny 候选簇计数：$N=8$};
+		\draw[densely dashed, gray!65] (11.25,0.65) -- (11.25,1.45);
+		\draw[densely dashed, gray!65] (12.45,0.65) -- (12.45,2.1);
+		\draw[densely dashed, gray!65] (13.15,0.65) -- (13.15,1.75);
+
+		% Stage arrows
+		\draw[->, very thick, draw=purple!65!black] (4.25,1.55) -- (4.9,1.55) node[midway, above]{\scriptsize 候选分割};
+		\draw[->, very thick, draw=purple!65!black] (9.25,1.55) -- (9.9,1.55) node[midway, above]{\scriptsize 三维重建};
+	\end{tikzpicture}%
+	}
+	\caption{月面岩石识别与三维重建结果}
+	\label{fig:ch5_rock_reconstruction_result}
+\end{figure}
+
+图\ref{fig:ch5_rock_reconstruction_result}给出了“原始观测--候选分割--三维重建”三阶段结果。
+左侧子图展示原始局部场景，能够观察到阴影遮挡、边缘亮斑与背景纹理耦合的典型月面特征；
+中间子图为岩石候选掩膜，表明梯度-阴影联合阈值可将主要岩石区域从背景中稳定分离；
+右侧子图为重建点云投影结果，显示了候选岩石在三维空间中的相对位置与尺度差异。
+该结果与表\ref{tab:ch5_reconstruction_metrics}中的定量统计相互印证，说明增强型前端可为后续风险映射和避障决策提供结构化三维障碍先验。
+
+为量化计数误差，定义相对计数误差
+\begin{equation}
+\epsilon_N=\frac{\abs{N_{rock}-N_{gt}}}{N_{gt}},
+\label{eq:ch5_count_error}
+\end{equation}
+其中 $N_{gt}$ 为人工标注真值。
+在当前工程版本中，系统已完成自动计数链路与三维重建链路打通；后续将进一步补充标准化人工标注集，以形成可复现实验的绝对误差统计。

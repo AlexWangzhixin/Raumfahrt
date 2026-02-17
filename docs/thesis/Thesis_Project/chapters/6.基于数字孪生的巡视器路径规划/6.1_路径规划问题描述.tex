@@ -1,0 +1,71 @@
+\chapter{基于数字孪生的巡视器路径规划}
+\label{ch:planning}
+
+\section{路径规划问题描述}
+\label{sec:ch6_problem}
+
+在第\ref{ch:perception}章完成岩石识别与风险建模后，路径规划问题可定义为：在满足动力学与安全约束的前提下，求解从起点到目标点的最优控制序列，使路径长度、风险、能耗和时延综合最小。
+与传统几何规划不同，本章问题具有显著的“环境-感知-动力学”耦合特征。
+
+\subsection{状态、动作与环境定义}
+\label{subsec:ch6_state_action}
+
+数字孪生规划环境定义为
+\begin{equation}
+\mathcal{E}=\left(\mathcal{X},\mathcal{U},\mathcal{M}_{DT},\mathcal{C}\right),
+\label{eq:ch6_env_def}
+\end{equation}
+其中 $\mathcal{X}$ 为状态空间，$\mathcal{U}$ 为动作空间，$\mathcal{M}_{DT}$ 为孪生地图图层集合，$\mathcal{C}$ 为约束集合。
+
+结合工程实现，状态向量写为
+\begin{equation}
+\mathbf{x}_k=\left[x_k,y_k,\theta_k,v_k,\bar{s}_k,\bar{z}_k\right]^\top,
+\label{eq:ch6_state}
+\end{equation}
+分别表示位置、航向、速度、局部平均滑移率与沉陷量。
+局部策略动作为离散 9 动作集合（低速/高速转向、直行与停车），与局部决策器动作编码保持一致。
+
+\subsection{约束条件}
+\label{subsec:ch6_constraints}
+
+本研究采用如下约束：
+\begin{equation}
+\mathcal{C}=
+\left\{
+\begin{aligned}
+&d\!\left((x_k,y_k),\mathcal{O}_k\right)\ge d_{safe,k},\\
+&0\le v_k\le v_{max},\\
+&\abs{\omega_k}\le \omega_{max},\\
+&\mathbf{x}_{k+1}=f(\mathbf{x}_k,\mathbf{u}_k,\mathbf{p}_k),
+\end{aligned}
+\right.
+\label{eq:ch6_constraints}
+\end{equation}
+其中第一式为避障安全约束，第二、三式为运动学约束，第四式为由动力学数字孪生给出的状态转移关系。
+
+当前系统关键参数统一设置为：地图分辨率 $1.0\,\mathrm{m}$，规划起止点 $(50,50)\rightarrow(950,950)$，动力学仿真频率 $20\,\mathrm{Hz}$，最大速度 $1.0\,\mathrm{m/s}$，局部安全半径 $0.2\,\mathrm{m}$。
+
+\subsection{优化目标与性能指标}
+\label{subsec:ch6_objective}
+
+路径规划优化目标定义为
+\begin{equation}
+\min_{\pi}\ J(\pi)=
+\lambda_l L(\pi)
++\lambda_r R(\pi)
++\lambda_e E(\pi)
++\lambda_t T(\pi)
++\lambda_c C_{ctrl}(\pi),
+\label{eq:ch6_objective}
+\end{equation}
+其中 $L$ 为路径长度项，$R$ 为风险积分项，$E$ 为能耗项，$T$ 为计算时延项，$C_{ctrl}$ 为控制平滑项。
+
+实验评价采用以下指标：
+\begin{myitemize}
+	\item 规划质量：路径长度、累计转向量、最小安全裕度；
+	\item 安全性：碰撞/穿障次数、风险积分值；
+	\item 实时性：规划时延均值、$P95$ 时延；
+	\item 工程可用性：仿真成功率与地面平台可视化执行稳定性。
+\end{myitemize}
+
+上述定义为第\ref{sec:ch6_framework}节的系统架构与第\ref{sec:ch6_ad3qn}节的混合算法提供统一数学基础。

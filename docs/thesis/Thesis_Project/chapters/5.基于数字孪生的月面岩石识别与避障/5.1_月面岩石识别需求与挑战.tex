@@ -1,0 +1,92 @@
+\chapter{基于数字孪生的月面岩石识别与避障}
+\label{ch:perception}
+
+\section{月面岩石识别需求与挑战}
+\label{sec:ch5_requirements}
+
+前两章完成了数字孪生框架与月面环境建模，第四章完成了动力学可演化孪生体构建。
+在此基础上，本章关注“感知--避障”耦合问题，即如何在月面强不确定场景下稳定识别岩石目标，并将识别结果转化为可执行的避障决策。
+工程上，岩石识别模块不再是独立视觉任务，而是直接服务于路径风险评估、局部重规划触发和安全冗余计算。
+
+结合项目统一实验设定与阶段性验证结果，本文将感知侧需求概括为表\ref{tab:ch5_requirements_metrics}所示五类约束。
+
+\begin{table}[H]
+	\centering
+	\small
+	\caption{月面岩石识别与避障的核心工程需求与指标约束}
+	\label{tab:ch5_requirements_metrics}
+	\begin{tabular}{p{0.18\textwidth}p{0.24\textwidth}p{0.46\textwidth}}
+		\toprule
+		约束类别 & 指标项 & 目标/现有工程基线 \\
+		\midrule
+		空间分辨率 & 地图分辨率 $\Delta_m$ & 感知实验配置 $0.1\,\mathrm{m}$；端到端推演配置 $1.0\,\mathrm{m}$ \\
+		目标规模 & 需检测最小障碍尺度 & 以车轮半径/安全半径约束，重点识别直径 $\ge 0.3\,\mathrm{m}$ 岩石 \\
+		实时性 & 单次特征提取时延 & 30次重复测得均值 $99.96\,\mathrm{ms}$，标准差 $11.18\,\mathrm{ms}$ \\
+		鲁棒性 & 复杂光照与遮挡条件稳定性 & 需在阴影、低纹理、强反照率变化下保持连续识别输出 \\
+		可用性 & 与规划接口一致性 & 输出应直接映射为风险代价、障碍掩膜与安全距离输入 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsection{工程需求}
+
+岩石识别模块需要同时满足“可测”“可算”“可用”三重目标：
+\begin{equation}
+\mathcal{R}_{per}=\arg\min_{\mathcal{M}}
+\left(
+\lambda_1 \mathcal{E}_{det}+
+\lambda_2 \mathcal{T}_{lat}+
+\lambda_3 \mathcal{E}_{int}
+\right),
+\label{eq:ch5_requirement_objective}
+\end{equation}
+其中，$\mathcal{E}_{det}$ 表示检测误差项，$\mathcal{T}_{lat}$ 表示时延代价，$\mathcal{E}_{int}$ 表示感知到规划接口不一致造成的系统误差，$\lambda_i$ 为权重系数。
+式\eqref{eq:ch5_requirement_objective}强调了工程目标并非仅追求视觉精度，而是追求系统级最优。
+
+结合车体参数（质量 $140\,\mathrm{kg}$、轮半径 $0.1525\,\mathrm{m}$、局部规划安全半径 $0.2\,\mathrm{m}$）与第4章动力学约束，可将障碍安全间距写为
+\begin{equation}
+d_{\mathrm{safe}}=r_{\mathrm{rover}}+r_{\mathrm{rock}}+v\tau+k_\sigma \sigma_p,
+\label{eq:ch5_safe_distance_base}
+\end{equation}
+其中 $r_{\mathrm{rover}}$ 为巡视器等效安全半径，$r_{\mathrm{rock}}$ 为岩石等效半径，$v$ 为当前速度，$\tau$ 为感知--决策链路时延，$\sigma_p$ 为定位不确定度，$k_\sigma$ 为置信放大系数。
+因此，岩石识别输出必须至少包含目标几何尺度与位置置信信息，才能支撑避障控制闭环。
+
+\subsection{月面场景下的关键挑战}
+
+\textbf{(1) 光照剧烈变化导致特征漂移。}
+月面缺乏大气散射，阴影边界陡峭，局部亮度分布呈现强非线性。
+设输入灰度为 $I(x,y,t)$，其光照扰动可抽象为
+\begin{equation}
+I(x,y,t)=\rho(x,y)\cdot L(t)\cdot \cos\theta(x,y,t)+\epsilon,
+\label{eq:ch5_lighting}
+\end{equation}
+其中 $\rho$ 为反照率，$L(t)$ 为时变辐照强度，$\theta$ 为入射角，$\epsilon$ 为传感器噪声。
+当 $L(t)$ 与 $\theta$ 联合波动时，传统基于固定阈值或纯纹理特征的方法易产生漏检与误检。
+
+\textbf{(2) 地形复杂性与岩石形态多样性耦合。}
+在坡地、碎屑区与坑缘区域，岩石边界与地形起伏常出现混叠，造成“几何边缘=障碍边缘”的假设失效。
+项目中可通行性图由语义先验和坡度惩罚共同构成：
+\begin{equation}
+T(x,y)=T_s(x,y)\cdot \left(1-0.3\cdot \hat{S}(x,y)\right),
+\label{eq:ch5_traversability}
+\end{equation}
+其中 $T_s$ 为语义基准可通行性，$\hat{S}$ 为归一化坡度项。
+这意味着感知模型必须显式利用地形上下文，而非仅依赖局部纹理。
+
+\textbf{(3) 识别结果需满足规划可解释性。}
+规划模块需要的是“风险场”而非单一边界框。
+因此感知输出需从目标级信息扩展到代价级信息：
+\begin{equation}
+R_{obs}(x,y)=\omega_d D^{-1}(x,y)+\omega_s S(x,y)+\omega_o O(x,y),
+\label{eq:ch5_risk_field}
+\end{equation}
+其中 $D$ 表示与障碍的距离场，$S$ 表示坡度/粗糙度项，$O$ 表示岩石占据概率。
+若缺乏这一映射，避障器将难以在多目标冲突条件下进行稳定决策。
+
+\textbf{(4) 计算资源受限下的实时闭环压力。}
+端到端系统同时运行环境更新、感知、全局规划、局部决策与动力学推演。
+感知模块即使精度较高，若时延超出规划周期同样会造成失效。
+实验中单次全局规划平均耗时约 $2487.57\,\mathrm{ms}$，因此局部感知链路需保持轻量化并提供增量更新能力，避免整体系统在复杂场景下失去实时性。
+
+综上，月面岩石识别问题本质上是“光照--地形--动力学--规划”多域耦合问题。
+下一节将在数字孪生平台内给出面向该耦合问题的统一识别框架。
