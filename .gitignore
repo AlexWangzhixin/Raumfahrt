@@ -61,6 +61,9 @@ coverage/
 *.tmp
 *.temp
 
+# Ignore executable files
+*.exe
+
 # Ignore specific directories
 Graphite_Segmentation/
 Thesis_Project/
