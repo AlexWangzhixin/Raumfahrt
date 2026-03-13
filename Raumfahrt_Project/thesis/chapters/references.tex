@@ -1,0 +1,18 @@
+% ==================== 参考文献（附件1-12） ====================
+% 格式要求：标题居中黑体小二号，内容宋体五号，行距固定值20磅
+
+% 参考文献标题：居中显示
+\begin{center}
+{\heiti\bfseries\zihao{-2} 参考文献}
+\end{center}
+\vspace{0.5\baselineskip}
+\addcontentsline{toc}{chapter}{参考文献}
+
+% 参考文献内容格式设置
+% 宋体五号（中文），Times New Roman五号（英文），行距固定值20磅
+% 序号格式：[1] 后接全角空格
+{\songti\zihao{5}\rmfamily
+\setlength{\baselineskip}{20pt}
+\setlength{\parskip}{0pt}
+\bibliography{references}
+}

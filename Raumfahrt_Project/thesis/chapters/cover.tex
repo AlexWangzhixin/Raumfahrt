@@ -1,0 +1,62 @@
+% ==================== 封面页 ====================
+% 封面页无页码
+\thispagestyle{empty}
+
+\begin{center}
+
+\vspace*{0.5cm}
+
+% ------------------ 顶部信息栏（完美对齐版） ------------------
+% 设计参数：
+% - 字号：四号 (\zihao{4})
+% - 左列总宽：8.8cm（标签+下划线）
+% - 右列总宽：6cm（标签+下划线）
+% - 行间距：0.6em
+% - 下划线提升：-0.3ex（与文字基线对齐）
+\zihao{4}
+\begin{tabular}{@{}>{\strut}p{8.8cm}>{\strut}p{6cm}@{}}
+    学\quad\quad\quad 号\raisebox{-0.3ex}{\underline{\makebox[3.8cm]{\studentid}}} & 
+    学校代码\raisebox{-0.3ex}{\underline{\makebox[2.8cm]{\schoolcode}}} \\[0.6em]
+    中图分类号\raisebox{-0.3ex}{\underline{\makebox[3.5cm]{\classification}}} & 
+    密\qquad 级\raisebox{-0.3ex}{\underline{\makebox[2.8cm]{\secretlevel}}} \\
+\end{tabular}
+
+\vfill
+
+% ------------------ 校徽 ------------------
+\includegraphics[width=4cm]{figures/logo.png}
+
+\vfill
+
+% ------------------ 学位类型（宋体小二） ------------------
+{\songti\zihao{-2} 博士学位论文}
+
+\vfill
+
+% ------------------ 论文题目（黑体二号） ------------------
+{\heiti\zihao{2} \thesistitle}
+
+\vfill
+
+% ------------------ 作者信息（宋体小三） ------------------
+\songti\zihao{-3}
+\begin{tabular}{rl}
+    作\quad\quad\quad 者： & \authorname \\[0.4em]
+    导\quad\quad\quad 师： & \supervisor \\
+\end{tabular}
+
+\vfill
+
+% ------------------ 学校名称（楷体小二） ------------------
+{\kaishu\zihao{-2} \institute}
+
+\vspace{0.4cm}
+
+% ------------------ 日期（楷体小二） ------------------
+{\kaishu\zihao{-2} \thesisdate}
+
+\vspace{0.5cm}
+
+\end{center}
+
+\newpage

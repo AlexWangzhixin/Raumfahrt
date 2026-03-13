@@ -1,0 +1,139 @@
+% ==================== 6.2 数字孪生环境下的路径规划框架 ====================
+\section{数字孪生环境下的路径规划框架}
+\label{sec:planning_framework}
+
+在数字孪生环境下，路径规划系统可以访问丰富的环境信息和计算资源，实现更智能的规划决策。本节构建数字孪生环境下的路径规划框架。
+
+\subsection{框架总体设计}
+\label{subsec:planning_design}
+
+数字孪生路径规划框架如图\ref{fig:planning_framework}所示，采用分层规划架构，包括全局规划层、局部规划层和运动控制层三个层次。
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        scale=0.8,
+        transform shape,
+        layer/.style={rectangle, draw, fill=#1, text width=10cm, text centered, minimum height=1.5cm}
+    ]
+        \node[layer=red!15] (global) at (0, 4) {\textbf{全局规划层}\\环境建模、目标确定、全局路径生成};
+        \node[layer=orange!20] (local) at (0, 2) {\textbf{局部规划层}\\动态避障、局部路径修正、行为决策};
+        \node[layer=green!15] (control) at (0, 0) {\textbf{运动控制层}\\轨迹跟踪、速度控制、转向控制};
+        
+        \draw[->, thick] (global) -- node[right]{全局路径} (local);
+        \draw[->, thick] (local) -- node[right]{局部轨迹} (control);
+        
+        \node[draw, fill=blue!10, text width=2.5cm, text centered] (dt) at (6, 2) {数字孪生\\环境模型\\动力学模型};
+        \draw[->, dashed] (dt) -- (global);
+        \draw[->, dashed] (dt) -- (local);
+        \draw[->, dashed] (dt) -- (control);
+    \end{tikzpicture}
+    \caption{数字孪生路径规划框架}
+    \label{fig:planning_framework}
+\end{figure}
+
+\textbf{（1）全局规划层}
+
+全局规划层负责生成从起点到终点的全局路径。主要功能包括：
+\begin{itemize}
+    \item 环境建模：构建代价地图，表示环境中的障碍和代价分布；
+    \item 目标确定：根据任务需求确定目标点；
+    \item 全局路径生成：基于代价地图生成最优全局路径。
+\end{itemize}
+
+全局规划利用数字孪生中的环境模型，包括地形模型、月壤模型、光照模型等，构建准确的代价地图。
+
+\textbf{（2）局部规划层}
+
+局部规划层负责处理动态障碍和局部路径修正。主要功能包括：
+\begin{itemize}
+    \item 动态避障：检测前方障碍，规划避障路径；
+    \item 局部路径修正：根据实时环境信息修正路径；
+    \item 行为决策：决策行走、停止、转向等行为。
+\end{itemize}
+
+局部规划利用数字孪生中的实时环境感知信息和动力学模型，确保规划路径可执行。
+
+\textbf{（3）运动控制层}
+
+运动控制层负责将规划路径转化为控制指令。主要功能包括：
+\begin{itemize}
+    \item 轨迹跟踪：跟踪规划的轨迹；
+    \item 速度控制：控制巡视器速度；
+    \item 转向控制：控制巡视器转向。
+\end{itemize}
+
+运动控制利用数字孪生中的动力学模型，预测控制效果，优化控制参数。
+
+\subsection{数字孪生支撑}
+\label{subsec:dt_support}
+
+数字孪生为路径规划提供以下支撑：
+
+\textbf{（1）环境模型支撑}
+
+数字孪生中的环境模型提供：
+\begin{itemize}
+    \item 地形高程数据，用于计算坡度、粗糙度；
+    \item 月壤力学参数，用于评估通过性；
+    \item 光照温度数据，用于能耗和热控分析；
+    \item 障碍物分布，用于避障规划。
+\end{itemize}
+
+\textbf{（2）动力学模型支撑}
+
+数字孪生中的动力学模型提供：
+\begin{itemize}
+    \item 运动学约束，确保路径可执行；
+    \item 动力学预测，评估行走性能；
+    \item 能耗预测，优化能耗路径。
+\end{itemize}
+
+\textbf{（3）仿真验证支撑}
+
+数字孪生中的仿真系统提供：
+\begin{itemize}
+    \item 路径可行性验证；
+    \item 行为预测仿真；
+    \item 多方案对比评估。
+\end{itemize}
+
+\subsection{代价地图构建}
+\label{subsec:cost_map}
+
+代价地图是路径规划的基础，表示环境中各位置的通行代价。本节构建多因素融合的代价地图。
+
+代价函数定义为：
+\begin{equation}
+    C(x, y) = w_1 C_d(x, y) + w_2 C_s(x, y) + w_3 C_o(x, y) + w_4 C_r(x, y)
+    \label{eq:cost_function}
+\end{equation}
+
+其中：
+\begin{itemize}
+    \item $C_d(x, y)$：距离代价，与到目标点的距离相关；
+    \item $C_s(x, y)$：坡度代价，与地形坡度相关，坡度越大代价越高；
+    \item $C_o(x, y)$：障碍代价，与障碍物距离相关，靠近障碍代价高；
+    \item $C_r(x, y)$：粗糙度代价，与地形粗糙度相关，粗糙度越大代价越高。
+\end{itemize}
+
+各代价函数的具体定义：
+
+坡度代价：
+\begin{equation}
+    C_s(x, y) = \begin{cases}
+        0, & \alpha < \alpha_{low} \\
+        \frac{\alpha - \alpha_{low}}{\alpha_{high} - \alpha_{low}}, & \alpha_{low} \le \alpha \le \alpha_{high} \\
+        \infty, & \alpha > \alpha_{high}
+    \end{cases}
+    \label{eq:cost_slope}
+\end{equation}
+
+障碍代价：
+\begin{equation}
+    C_o(x, y) = k_o \cdot \sum_{i=1}^{N} \frac{1}{d_i^2}
+    \label{eq:cost_obstacle}
+\end{equation}
+其中，$d_i$为到第$i$个障碍物的距离。
+
+代价地图的分辨率需要根据规划层次调整：全局规划使用粗分辨率（如1-5米），局部规划使用细分辨率（如0.1-0.5米）。

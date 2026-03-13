@@ -1,0 +1,100 @@
+% ==================== 2.3 月面巡视器自主行走增强数字孪生总体架构 ====================
+\section{月面巡视器自主行走增强数字孪生总体架构}
+\label{sec:architecture}
+
+基于增强的五维模型，本节构建月面巡视器自主行走数字孪生的总体架构。该架构采用分层设计思想，自下而上分为数据层、模型层、服务层和应用层四个层次，如图\ref{fig:architecture}所示。
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        scale=0.85,
+        transform shape,
+        layer/.style={rectangle, draw, fill=#1, text width=12cm, text centered, minimum height=1.2cm},
+        module/.style={rectangle, draw, fill=#1, text width=2.8cm, text centered, minimum height=0.8cm, font=\small}
+    ]
+        % 应用层
+        \node[layer=red!15] (app) at (0, 6) {\textbf{应用层}：任务规划、路径规划、避障决策、状态监控};
+        
+        % 服务层
+        \node[layer=orange!20] (svc) at (0, 4.5) {\textbf{服务层}};
+        \node[module=orange!30] at (-4.5, 4.5) {环境感知};
+        \node[module=orange!30] at (-1.5, 4.5) {状态监测};
+        \node[module=orange!30] at (1.5, 4.5) {行为预测};
+        \node[module=orange!30] at (4.5, 4.5) {决策支持};
+        
+        % 模型层
+        \node[layer=green!15] (mdl) at (0, 3) {\textbf{模型层}};
+        \node[module=green!25] at (-4.5, 3) {巡视器模型};
+        \node[module=green!25] at (-1.5, 3) {环境模型};
+        \node[module=green!25] at (1.5, 3) {交互模型};
+        \node[module=green!25] at (4.5, 3) {演化模型};
+        
+        % 数据层
+        \node[layer=blue!15] (dat) at (0, 1.5) {\textbf{数据层}};
+        \node[module=blue!25] at (-4.5, 1.5) {实体数据};
+        \node[module=blue!25] at (-1.5, 1.5) {环境数据};
+        \node[module=blue!25] at (1.5, 1.5) {状态数据};
+        \node[module=blue!25] at (4.5, 1.5) {知识数据};
+        
+        % 物理实体
+        \node[layer=gray!20] (phy) at (0, 0) {\textbf{物理实体}：月面巡视器 + 月面环境};
+        
+        % 连接箭头
+        \draw[->, thick] (phy.north) -- (dat.south);
+        \draw[->, thick] (dat.north) -- (mdl.south);
+        \draw[->, thick] (mdl.north) -- (svc.south);
+        \draw[->, thick] (svc.north) -- (app.south);
+    \end{tikzpicture}
+    \caption{月面巡视器自主行走数字孪生总体架构}
+    \label{fig:architecture}
+\end{figure}
+
+\textbf{（1）数据层}
+
+数据层是数字孪生系统的基础，负责多源异构数据的采集、存储、管理和融合。主要功能包括：
+\begin{itemize}
+    \item 数据采集：从巡视器传感器、地面测控系统、遥感数据库等获取数据；
+    \item 数据存储：建立分布式数据存储系统，支持大规模数据的高效存取；
+    \item 数据管理：提供数据质量评估、元数据管理、数据安全等功能；
+    \item 数据融合：实现多源数据的时空对齐、格式统一和融合处理。
+\end{itemize}
+
+\textbf{（2）模型层}
+
+模型层是数字孪生系统的核心，负责虚拟实体的构建和管理。主要功能包括：
+\begin{itemize}
+    \item 巡视器模型：几何模型、动力学模型、感知模型、行为模型；
+    \item 环境模型：地形模型、月壤模型、光照温度模型；
+    \item 交互模型：轮-壤相互作用模型、稳定性评估模型；
+    \item 演化模型：状态预测模型、参数自适应更新模型。
+\end{itemize}
+
+\textbf{（3）服务层}
+
+服务层是数字孪生系统的功能载体，为上层应用提供各种服务。主要功能包括：
+\begin{itemize}
+    \item 环境感知服务：地形分析、障碍识别、可通行性评估；
+    \item 状态监测服务：实时状态监测、异常检测、健康评估；
+    \item 行为预测服务：轨迹预测、性能预测、能耗预测；
+    \item 决策支持服务：路径规划、避障策略、任务调度。
+\end{itemize}
+
+\textbf{（4）应用层}
+
+应用层是数字孪生系统的用户接口，提供面向任务的应用功能。主要功能包括：
+\begin{itemize}
+    \item 任务规划：探测任务规划和资源调度；
+    \item 路径规划：全局路径和局部路径规划；
+    \item 避障决策：动态障碍规避和应急处置；
+    \item 状态监控：巡视器状态可视化和远程监控。
+\end{itemize}
+
+各层之间通过标准接口进行数据交换和功能调用，实现系统的松耦合和高内聚。数据层向上提供统一的数据访问接口，模型层向上提供模型服务接口，服务层向上提供应用编程接口（API），应用层面向最终用户提供可视化界面和交互功能。
+
+该架构具有以下特点：
+\begin{enumerate}
+    \item \textbf{层次分明}：采用分层设计，各层职责清晰，便于开发、维护和升级；
+    \item \textbf{模块化}：各功能模块相对独立，可根据需求灵活组合和扩展；
+    \item \textbf{可扩展}：支持新模型、新服务、新应用的便捷接入；
+    \item \textbf{高可靠}：具有容错机制和异常处理能力，确保系统稳定运行。
+\end{enumerate}

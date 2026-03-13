@@ -1,0 +1,83 @@
+% ==================== 2.1 经典五维模型的适用性分析与挑战 ====================
+\section{经典五维模型的适用性分析与挑战}
+\label{sec:classic_model}
+
+数字孪生技术的概念最早由Grieves教授于2003年提出，经过近二十年的发展，已形成较为完善的理论体系和方法论。本节回顾经典数字孪生五维模型的核心内涵，分析其直接应用于月面巡视器自主行走场景的局限性。
+
+\subsection{经典数字孪生五维模型核心内涵回顾}
+\label{subsec:classic_five_dim}
+
+经典数字孪生五维模型由Grieves和Vickers\cite{ref45}提出，将数字孪生系统划分为五个核心维度：物理实体（Physical Entity）、虚拟实体（Virtual Entity）、服务（Services）、孪生数据（Twin Data）和连接（Connections），如图\ref{fig:five_dim}所示。
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        node distance=2.5cm,
+        block/.style={rectangle, draw, fill=blue!15, text width=3cm, text centered, minimum height=1.5cm, rounded corners},
+        arrow/.style={<->, >=stealth, thick}
+    ]
+        \node[block] (pe) {物理实体\\Physical Entity};
+        \node[block, right=of pe] (ve) {虚拟实体\\Virtual Entity};
+        \node[block, below=of pe] (sv) {服务\\Services};
+        \node[block, below=of ve] (td) {孪生数据\\Twin Data};
+        \node[block, below right=1.25cm and 0.5cm of sv] (cn) {连接\\Connections};
+        
+        \draw[arrow] (pe) -- node[above]{\scriptsize 数据采集} (ve);
+        \draw[arrow] (pe) -- node[left]{\scriptsize 服务请求} (sv);
+        \draw[arrow] (ve) -- node[right]{\scriptsize 数据存储} (td);
+        \draw[arrow] (sv) -- node[below]{\scriptsize 数据支撑} (td);
+        \draw[arrow] (pe) -- (cn);
+        \draw[arrow] (ve) -- (cn);
+        \draw[arrow] (sv) -- (cn);
+        \draw[arrow] (td) -- (cn);
+    \end{tikzpicture}
+    \caption{经典数字孪生五维模型}
+    \label{fig:five_dim}
+\end{figure}
+
+\textbf{（1）物理实体}
+
+物理实体是指现实世界中存在的物理对象或系统，是数字孪生的映射源头。在航天领域，物理实体可以是航天器、空间站、探测器等。物理实体具备感知、执行、通讯等能力，能够与外界环境进行物质、能量和信息交换。
+
+\textbf{（2）虚拟实体}
+
+虚拟实体是物理实体在数字空间中的精确镜像，包括几何模型、物理模型、行为模型和规则模型等多个层次。虚拟实体通过数据驱动实现与物理实体的同步更新，能够模拟、预测和优化物理实体的行为。
+
+\textbf{（3）服务}
+
+服务是指数字孪生系统提供的功能和应用，包括状态监测、行为仿真、预测分析、优化控制等。服务是数字孪生价值体现的核心载体，决定了数字孪生的实际效用。
+
+\textbf{（4）孪生数据}
+
+孪生数据是数字孪生系统运行的基础，包括物理实体数据、虚拟实体数据、服务数据、知识数据、融合数据等。孪生数据贯穿数字孪生全生命周期，支撑各模块的信息交互和协同工作。
+
+\textbf{（5）连接}
+
+连接是各维度之间的信息通道，实现数据的实时传输和交互。连接包括物理实体与虚拟实体之间的数据连接、服务与孪生数据之间的信息连接、各模块之间的通信连接等。
+
+\subsection{直接应用于月面自主行走场景的局限性}
+\label{subsec:limitation}
+
+经典五维模型为数字孪生系统的构建提供了通用框架，但直接应用于月面巡视器自主行走场景存在以下局限性：
+
+\textbf{（1）物理实体维度缺乏环境融合}
+
+经典模型将物理实体和外部环境分离处理，而月面巡视器的行为与月面环境高度耦合。巡视器的行走性能受地形坡度、月壤力学特性、光照条件等因素显著影响，必须将环境因素纳入物理实体的考量范畴。
+
+\textbf{（2）虚拟实体维度缺乏实时演化机制}
+
+经典模型假设虚拟实体通过数据更新实现同步，但月面环境下数据传输存在显著时延，虚拟实体需要具备自主演化能力，在缺乏实时数据时仍能保持合理的预测精度。
+
+\textbf{（3）服务维度缺乏自主决策支持}
+
+经典模型的服务功能以监测、分析为主，而月面巡视器自主行走需要服务层具备决策支持能力，能够在通讯受限条件下独立完成环境理解、路径规划和避障决策。
+
+\textbf{（4）孪生数据维度缺乏多源异构融合}
+
+月面巡视器自主行走涉及视觉、力学、热学等多源异构数据，经典模型缺乏对这些数据的统一描述和融合机制，难以支撑跨域协同分析。
+
+\textbf{（5）连接维度缺乏时延补偿机制}
+
+经典模型假设连接是即时的，而地-月通讯存在约2.5秒时延，需要引入时延补偿机制，确保虚拟实体与物理实体之间映射关系的有效性。
+
+综上所述，需要对经典五维模型进行适应性增强，以适应月面巡视器自主行走的特殊需求。

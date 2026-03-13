@@ -36,6 +36,13 @@ __pycache__/
 # Ignore environment files
 lunar_env/
 
+# Ignore config files with sensitive info
+config.ini
+.env
+*.env
+.env.local
+.env.*.local
+
 # Ignore IDE files
 .idea/
 *.suo

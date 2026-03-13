@@ -1,0 +1,168 @@
+% ==================== 4.3 多体动力学模型构建 ====================
+\section{多体动力学模型构建}
+\label{sec:multibody}
+
+基于轮-壤交互力学模型，本节构建巡视器整体的多体动力学模型。首先分析巡视器的拓扑结构，然后建立运动学和动力学方程，最后实现数字孪生仿真。
+
+\subsection{巡视器拓扑结构分析}
+\label{subsec:topology}
+
+月面巡视器通常采用摇臂-转向架（Rocker-Bogie）悬架系统，以适应复杂地形。以典型的六轮巡视器为例，其拓扑结构如图\ref{fig:rover_topology}所示。
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        scale=0.8,
+        transform shape,
+        body/.style={rectangle, draw, fill=blue!20, minimum width=4cm, minimum height=1cm},
+        arm/.style={rectangle, draw, fill=green!20, minimum width=2cm, minimum height=0.5cm},
+        wheel/.style={circle, draw, fill=gray!30, minimum size=0.8cm}
+    ]
+        % 车身
+        \node[body] (body) at (0, 2) {车身};
+        
+        % 左侧摇臂
+        \node[arm] (larm) at (-2.5, 1) {摇臂};
+        \node[arm] (lbogie) at (-3.5, 0) {转向架};
+        
+        % 右侧摇臂
+        \node[arm] (rarm) at (2.5, 1) {摇臂};
+        \node[arm] (rbogie) at (3.5, 0) {转向架};
+        
+        % 车轮
+        \node[wheel] (wl1) at (-4.5, -0.5) {};
+        \node[wheel] (wl2) at (-3, -0.5) {};
+        \node[wheel] (wl3) at (-1.5, -0.5) {};
+        \node[wheel] (wr1) at (4.5, -0.5) {};
+        \node[wheel] (wr2) at (3, -0.5) {};
+        \node[wheel] (wr3) at (1.5, -0.5) {};
+        
+        % 连接
+        \draw[thick] (body.south) -- (larm.north);
+        \draw[thick] (body.south) -- (rarm.north);
+        \draw[thick] (larm.south) -- (lbogie.north);
+        \draw[thick] (rarm.south) -- (rbogie.north);
+        \draw[thick] (lbogie.south) -- (wl1.north);
+        \draw[thick] (lbogie.south) -- (wl2.north);
+        \draw[thick] (larm.south) -- (wl3.north);
+        \draw[thick] (rbogie.south) -- (wr1.north);
+        \draw[thick] (rbogie.south) -- (wr2.north);
+        \draw[thick] (rarm.south) -- (wr3.north);
+        
+        % 标注
+        \node at (-4.5, -1.2) {\scriptsize 车轮1};
+        \node at (-3, -1.2) {\scriptsize 车轮2};
+        \node at (-1.5, -1.2) {\scriptsize 车轮3};
+        \node at (4.5, -1.2) {\scriptsize 车轮4};
+        \node at (3, -1.2) {\scriptsize 车轮5};
+        \node at (1.5, -1.2) {\scriptsize 车轮6};
+    \end{tikzpicture}
+    \caption{巡视器拓扑结构示意图}
+    \label{fig:rover_topology}
+\end{figure}
+
+巡视器由以下部件组成：
+\begin{itemize}
+    \item \textbf{车身}：承载科学仪器、通信设备、控制计算机等；
+    \item \textbf{摇臂}：连接车身与转向架，可绕水平轴转动；
+    \item \textbf{转向架}：连接摇臂与车轮，实现车轮的相对运动；
+    \item \textbf{车轮}：与地面接触，提供驱动力和转向力。
+\end{itemize}
+
+巡视器的运动自由度包括：
+\begin{itemize}
+    \item 车身：3个平动自由度 + 3个转动自由度；
+    \item 摇臂：每侧1个转动自由度；
+    \item 转向架：每侧1个转动自由度；
+    \item 车轮：每个车轮1个转动自由度（驱动）+ 部分车轮1个转向自由度。
+\end{itemize}
+
+\subsection{运动学方程建立}
+\label{subsec:kinematics}
+
+采用D-H参数法建立巡视器运动学方程。定义坐标系如下：
+\begin{itemize}
+    \item 惯性坐标系$\{O_I\}$：固定在月面上；
+    \item 车身坐标系$\{O_B\}$：固定在车身上；
+    \item 车轮坐标系$\{O_W\}$：固定在每个车轮上。
+\end{itemize}
+
+车轮中心在惯性坐标系中的位置可表示为：
+\begin{equation}
+    \mathbf{r}_{W_i}^I = \mathbf{r}_B^I + \mathbf{R}_B^I \cdot \mathbf{r}_{W_i}^B
+    \label{eq:wheel_pos}
+\end{equation}
+其中，$\mathbf{r}_B^I$为车身中心位置，$\mathbf{R}_B^I$为车身姿态矩阵，$\mathbf{r}_{W_i}^B$为第$i$个车轮在车身坐标系中的位置。
+
+车轮速度可通过微分得到：
+\begin{equation}
+    \mathbf{v}_{W_i}^I = \mathbf{v}_B^I + \boldsymbol{\omega}_B^I \times \mathbf{R}_B^I \cdot \mathbf{r}_{W_i}^B + \mathbf{R}_B^I \cdot \dot{\mathbf{r}}_{W_i}^B
+    \label{eq:wheel_vel}
+\end{equation}
+
+\subsection{动力学方程建立}
+\label{subsec:dynamics}
+
+采用Lagrange方法建立巡视器动力学方程。系统的Lagrange函数为：
+\begin{equation}
+    L = T - V
+    \label{eq:lagrange}
+\end{equation}
+其中，$T$为系统动能，$V$为系统势能。
+
+系统动能：
+\begin{equation}
+    T = \frac{1}{2}\sum_{i=1}^{N} m_i \mathbf{v}_i^T \mathbf{v}_i + \frac{1}{2}\sum_{i=1}^{N} \boldsymbol{\omega}_i^T \mathbf{I}_i \boldsymbol{\omega}_i
+    \label{eq:kinetic}
+\end{equation}
+
+系统势能（低重力环境）：
+\begin{equation}
+    V = \sum_{i=1}^{N} m_i g_{moon} h_i
+    \label{eq:potential}
+\end{equation}
+
+动力学方程：
+\begin{equation}
+    \mathbf{M}(\mathbf{q})\ddot{\mathbf{q}} + \mathbf{C}(\mathbf{q}, \dot{\mathbf{q}})\dot{\mathbf{q}} + \mathbf{G}(\mathbf{q}) = \boldsymbol{\tau} + \mathbf{J}^T \mathbf{F}_{soil}
+    \label{eq:dynamics_eq}
+\end{equation}
+其中，$\mathbf{q}$为广义坐标，$\mathbf{M}$为质量矩阵，$\mathbf{C}$为科氏力矩阵，$\mathbf{G}$为重力项，$\boldsymbol{\tau}$为驱动力矩，$\mathbf{J}$为雅可比矩阵，$\mathbf{F}_{soil}$为轮-壤相互作用力。
+
+\subsection{数字孪生仿真实现}
+\label{subsec:dt_simulation}
+
+基于上述动力学模型，构建巡视器数字孪生仿真系统。系统架构如图\ref{fig:dyn_sim}所示。
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        scale=0.85,
+        transform shape,
+        block/.style={rectangle, draw, fill=blue!10, text width=3cm, text centered, minimum height=1cm, rounded corners}
+    ]
+        \node[block] (input) at (0, 3) {输入模块\\控制指令};
+        \node[block] (dyn) at (0, 1.5) {动力学求解\\数值积分};
+        \node[block] (soil) at (4, 1.5) {轮-壤模型\\力计算};
+        \node[block] (env) at (4, 3) {环境模块\\地形、月壤};
+        \node[block] (output) at (0, 0) {输出模块\\状态数据};
+        
+        \draw[->, thick] (input) -- (dyn);
+        \draw[->, thick] (dyn) -- (output);
+        \draw[<->, thick] (dyn) -- (soil);
+        \draw[->, thick] (env) -- (soil);
+    \end{tikzpicture}
+    \caption{动力学数字孪生仿真系统架构}
+    \label{fig:dyn_sim}
+\end{figure}
+
+仿真流程：
+\begin{enumerate}
+    \item 根据控制指令确定车轮驱动和转向输入；
+    \item 调用环境模块获取车轮接触点的地形和月壤参数；
+    \item 调用轮-壤模型计算接触力；
+    \item 求解动力学方程，更新巡视器状态；
+    \item 输出位置、姿态、速度等状态数据。
+\end{enumerate}
+
+采用Runge-Kutta四阶方法进行数值积分，时间步长取10-50 ms，可满足实时性要求。

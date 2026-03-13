@@ -1,0 +1,199 @@
+% ==================== 2.2 面向月面巡视器自主行走的数字孪生增强五维模型 ====================
+\section{面向月面巡视器自主行走的数字孪生增强五维模型}
+\label{sec:enhanced_model}
+
+针对经典五维模型在月面巡视器自主行走场景下的局限性，本节提出增强的五维数字孪生模型。该模型从物理实体、虚拟实体、服务、孪生数据、连接五个维度进行适应性增强，以满足月面复杂环境下巡视器自主行走的需求。
+
+\subsection{增强的物理实体}
+\label{subsec:enhanced_pe}
+
+增强的物理实体在经典定义基础上，将月面环境纳入物理实体的范畴，形成"巡视器-环境"一体化物理系统。具体包括：
+
+\textbf{（1）巡视器本体}
+
+巡视器本体是物理实体的核心，包括：
+\begin{itemize}
+    \item \textbf{结构系统}：车身、悬架、车轮等机械结构；
+    \item \textbf{动力系统}：太阳能电池板、蓄电池、驱动电机等；
+    \item \textbf{感知系统}：导航相机、全景相机、避障相机等；
+    \item \textbf{通信系统}：天线、收发设备等；
+    \item \textbf{热控系统}：隔热层、热管、加热器等。
+\end{itemize}
+
+\textbf{（2）月面环境}
+
+月面环境是影响巡视器行走的外部因素，包括：
+\begin{itemize}
+    \item \textbf{地形环境}：高程、坡度、粗糙度等地形特征；
+    \item \textbf{月壤环境}：颗粒组成、密度、内聚力、内摩擦角等力学参数；
+    \item \textbf{光照环境}：太阳高度角、光照强度、阴影分布等；
+    \item \textbf{温度环境}：表面温度分布及其时变规律。
+\end{itemize}
+
+\textbf{（3）交互行为}
+
+交互行为描述巡视器与环境的相互作用，包括：
+\begin{itemize}
+    \item 车轮与月壤的接触力学行为；
+    \item 巡视器在坡面上的稳定性行为；
+    \item 避障过程中的机动行为等。
+\end{itemize}
+
+\subsection{增强的虚拟实体}
+\label{subsec:enhanced_ve}
+
+增强的虚拟实体在经典模型基础上，增加自主演化机制，提高在数据时延条件下的预测能力。具体包括：
+
+\textbf{（1）巡视器数字模型}
+
+\begin{itemize}
+    \item \textbf{几何模型}：基于CAD数据构建的三维几何模型，精确描述巡视器的形状和尺寸；
+    \item \textbf{动力学模型}：基于多体动力学理论构建的运动学和动力学模型；
+    \item \textbf{感知模型}：描述传感器性能、噪声特性、视场范围等的数学模型；
+    \item \textbf{行为模型}：描述巡视器在特定任务下的行为逻辑和规则。
+\end{itemize}
+
+\textbf{（2）环境数字模型}
+
+\begin{itemize}
+    \item \textbf{地形数字孪生模型}：基于DEM数据和高程信息构建的三维地形模型；
+    \item \textbf{月壤数字孪生模型}：描述月壤力学特性的本构模型；
+    \item \textbf{光照温度数字孪生模型}：基于太阳运动规律的光照和温度场模型。
+\end{itemize}
+
+\textbf{（3）自主演化机制}
+
+自主演化机制使虚拟实体在缺乏实时数据时能够根据物理规律和先验知识进行状态预测。主要技术包括：
+\begin{itemize}
+    \item 基于动力学方程的状态推演；
+    \item 基于机器学习的行为预测；
+    \item 基于置信度评估的预测修正。
+\end{itemize}
+
+\subsection{增强的服务}
+\label{subsec:enhanced_services}
+
+增强的服务在经典监测分析功能基础上，增加自主决策支持能力。主要包括：
+
+\textbf{（1）环境感知服务}
+
+\begin{itemize}
+    \item 地形特征提取与分析；
+    \item 障碍物（岩石、撞击坑）识别与定位；
+    \item 可通行区域评估。
+\end{itemize}
+
+\textbf{（2）状态监测服务}
+
+\begin{itemize}
+    \item 巡视器姿态、位置、速度等状态监测；
+    \item 车轮沉陷、滑移等行走状态监测；
+    \item 能源、热控等系统状态监测。
+\end{itemize}
+
+\textbf{（3）行为预测服务}
+
+\begin{itemize}
+    \item 运动轨迹预测；
+    \item 行走性能预测（通过性、稳定性等）；
+    \item 能源消耗预测。
+\end{itemize}
+
+\textbf{（4）路径规划服务}
+
+\begin{itemize}
+    \item 全局路径规划；
+    \item 局部路径规划；
+    \item 动态避障规划。
+\end{itemize}
+
+\textbf{（5）决策支持服务}
+
+\begin{itemize}
+    \item 行走策略优化；
+    \item 异常情况处置建议；
+    \item 任务调度建议。
+\end{itemize}
+
+\subsection{增强的孪生数据}
+\label{subsec:enhanced_data}
+
+增强的孪生数据建立统一的数据描述框架，实现多源异构数据的融合管理。主要包括：
+
+\textbf{（1）实体数据}
+
+\begin{itemize}
+    \item 巡视器几何参数、质量特性、运动学参数等；
+    \item 传感器标定参数、性能参数等。
+\end{itemize}
+
+\textbf{（2）环境数据}
+
+\begin{itemize}
+    \item 地形高程数据、坡度数据等；
+    \item 月壤力学参数数据；
+    \item 光照、温度环境数据。
+\end{itemize}
+
+\textbf{（3）状态数据}
+
+\begin{itemize}
+    \item 巡视器实时状态数据（位置、姿态、速度等）；
+    \item 传感器测量数据（图像、距离等）。
+\end{itemize}
+
+\textbf{（4）行为数据}
+
+\begin{itemize}
+    \item 运动历史数据；
+    \item 控制指令执行记录；
+    \item 行走性能评估数据。
+\end{itemize}
+
+\textbf{（5）知识数据}
+
+\begin{itemize}
+    \item 轮-壤相互作用模型参数；
+    \item 行走规则和约束条件；
+    \item 历史任务经验数据。
+\end{itemize}
+
+\textbf{（6）融合数据}
+
+通过数据融合算法，将上述多源数据进行时空对齐、格式统一、质量评估，形成高质量的孪生数据集。
+
+\subsection{增强的连接}
+\label{subsec:enhanced_connection}
+
+增强的连接引入时延补偿机制，确保虚实映射的有效性。主要包括：
+
+\textbf{（1）数据传输连接}
+
+\begin{itemize}
+    \item 巡视器-地面站数据链路；
+    \item 地面站-数字孪生平台数据链路；
+    \item 数据压缩、加密、传输协议。
+\end{itemize}
+
+\textbf{（2）指令执行连接}
+
+\begin{itemize}
+    \item 数字孪生平台生成的控制指令传输；
+    \item 指令执行状态反馈。
+\end{itemize}
+
+\textbf{（3）时延补偿机制}
+
+\begin{itemize}
+    \item 基于时间戳的数据同步；
+    \item 基于状态预测的时延补偿；
+    \item 基于置信度的数据加权融合。
+\end{itemize}
+
+\textbf{（4）虚实同步机制}
+
+\begin{itemize}
+    \item 虚拟实体状态更新机制；
+    \item 模型参数自适应调整机制；
+    \item 异常状态检测与恢复机制。
+\end{itemize}

@@ -1,0 +1,94 @@
+% ==================== 题名页（附件1-3） ====================
+% 严格按照航天工程大学博士学位论文题名页格式
+\thispagestyle{empty}
+
+% % ==================== 顶部信息栏 ====================
+% \zihao{4}
+% \noindent
+% \hspace{2cm}%
+% \begin{tabular}{@{}p{2.5cm}p{5.5cm}p{2.5cm}p{5.5cm}@{}}
+%     学\qquad 号 & \underline{\makebox[4cm]{\studentid}} &
+%     学校代码 & \underline{\makebox[3cm]{\schoolcode}} \\[0.8em]
+%     中图分类号 & \underline{\makebox[4cm]{\classification}} &
+%     密\qquad 级 & \underline{\makebox[3cm]{\secretlevel}} \\
+% \end{tabular}
+
+% ------------------ 顶部信息栏（完美对齐版） ------------------
+% 设计参数：
+% - 字号：四号 (\zihao{4})
+% - 左列总宽：8.8cm（标签+下划线）
+% - 右列总宽：6cm（标签+下划线）
+% - 行间距：0.6em
+% - 下划线提升：-0.3ex（与文字基线对齐）
+\zihao{4}
+\begin{tabular}{@{}>{\strut}p{8.8cm}>{\strut}p{6cm}@{}}
+    学\quad\quad\quad 号\raisebox{-0.3ex}{\underline{\makebox[3.8cm]{\studentid}}} & 
+    学校代码\raisebox{-0.3ex}{\underline{\makebox[2.8cm]{\schoolcode}}} \\[0.6em]
+    中图分类号\raisebox{-0.3ex}{\underline{\makebox[3.5cm]{\classification}}} & 
+    密\qquad 级\raisebox{-0.3ex}{\underline{\makebox[2.8cm]{\secretlevel}}} \\
+\end{tabular}
+
+
+\vspace{1.5cm}
+
+% ==================== 大学名称（华文行楷一号加粗） ====================
+\begin{center}
+{\bfseries\huawenxingkai\zihao{1} \institute}
+\end{center}
+
+\vspace{0.8cm}
+
+% ==================== 学位类型（隶书一号加粗） ====================
+\begin{center}
+{\bfseries\lishufile\zihao{1} 博士学位论文}
+\end{center}
+
+\vspace{1.5cm}
+
+% ==================== 论文题目（中文，黑体二号居中，分两行） ====================
+\begin{center}
+{\heiti\zihao{2} 面向月面巡视器自主行走的}\\[0.3em]
+{\heiti\zihao{2} 数字孪生技术研究}
+\end{center}
+
+\vfill
+
+% ==================== 论文题目（英文全大写，Times New Roman小二号居中，分三行） ====================
+\begin{center}
+{\zihao{-2} RESEARCH ON DIGITAL TWIN TECHNOLOGY}\\[0.2em]
+{\zihao{-2} FOR AUTONOMOUS LUNAR ROVER}\\[0.2em]
+{\zihao{-2} LOCOMOTION}
+\end{center}
+
+\vfill
+
+% ==================== 作者信息（minipage两列布局，黑体四号） ====================
+\zihao{4}
+\noindent
+\hspace{2cm}%
+\begin{minipage}[t]{0.42\textwidth}
+{\heiti
+    作\qquad 者\underline{\makebox[4cm]{\authorname}}\\[0.8em]
+    申请学位\underline{\makebox[4cm]{工学博士}}\\[0.8em]
+    学科专业\underline{\makebox[4cm]{航天信息工程}}\\[0.8em]
+    答辩委员会主席\underline{\makebox[2.5cm]{}}}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.45\textwidth}
+{\heiti
+    导\qquad 师\underline{\makebox[4.5cm]{\supervisor}}\\[0.8em]
+    培养单位\underline{\makebox[4.5cm]{宇航学院}}\\[0.8em]
+    研究方向 \underline{\makebox[4.5cm]{航天信息处理与应用}}\\[0.8em]
+    评\quad 阅\quad 人\underline{\makebox[4cm]{}}}
+\end{minipage}
+
+\vfill
+
+% ==================== 日期（Times New Roman四号） ====================
+\begin{center}
+{\zihao{4} 2026年07月}
+\end{center}
+
+\vspace{0.5cm}
+
+\newpage

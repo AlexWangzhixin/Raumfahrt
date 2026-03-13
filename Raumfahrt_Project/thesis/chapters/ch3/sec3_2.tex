@@ -1,0 +1,92 @@
+% ==================== 3.2 月面地形数字孪生建模 ====================
+\section{月面地形数字孪生建模}
+\label{sec:terrain_modeling}
+
+月面地形数字孪生建模的目标是在数字空间中重构月面的三维地形特征，为巡视器的路径规划、通过性分析、稳定性评估提供地形数据支撑。本节从地形数据获取、地形模型构建、地形特征提取三个方面展开研究。
+
+\subsection{地形数据获取与预处理}
+\label{subsec:terrain_data}
+
+月面地形数据的获取主要依靠遥感探测手段，包括激光高度计、立体相机、雷达等。目前主要的月面地形数据来源包括：
+
+\textbf{（1）LRO激光高度计（LOLA）数据}
+
+月球勘测轨道器（LRO）搭载的激光高度计LOLA（Lunar Orbiter Laser Altimeter）获取了高精度的月面高程数据。LOLA数据的空间分辨率约为10-30米，垂直精度优于1米，是目前精度最高的全球月面地形数据源\cite{ref46}。
+
+\textbf{（2）嫦娥系列探测数据}
+
+我国嫦娥一号、嫦娥二号搭载的激光高度计获取了全月球DEM数据。嫦娥三号、嫦娥四号、嫦娥五号的着陆区获取了更高分辨率的局部地形数据\cite{ref47}。
+
+\textbf{（3）Apollo着陆区数据}
+
+Apollo计划获取的立体影像和激光测距数据提供了着陆区的高精度地形信息\cite{ref48}。
+
+数据的预处理包括：
+\begin{itemize}
+    \item 数据格式转换：将原始数据转换为统一格式；
+    \item 坐标系统一：将不同坐标系的数据统一到同一参考系；
+    \item 数据插值：对缺失数据进行插值补全；
+    \item 滤波去噪：消除数据中的噪声和异常值。
+\end{itemize}
+
+\subsection{三维地形模型构建}
+\label{subsec:terrain_3d}
+
+基于预处理后的高程数据，构建三维地形模型。采用规则格网（Grid）和不规则三角网（TIN）两种表达方式。
+
+\textbf{（1）规则格网模型}
+
+规则格网模型将地形表示为二维矩阵，每个元素存储对应位置的高程值。设格网分辨率为$\Delta x \times \Delta y$，则地形模型可表示为：
+\begin{equation}
+    H = \{h_{i,j}\}, \quad i = 1, 2, \ldots, m; \quad j = 1, 2, \ldots, n
+    \label{eq:grid_model}
+\end{equation}
+其中，$h_{i,j}$表示位置$(x_i, y_j)$处的高程值。
+
+规则格网的优点是结构简单、计算效率高，适合大规模地形的存储和处理。缺点是数据量随分辨率增加而快速增大。
+
+\textbf{（2）不规则三角网模型}
+
+不规则三角网（TIN）模型将地形表示为一系列不重叠的三角形面片。设地形表面为$S$，则TIN模型可表示为：
+\begin{equation}
+    S = \{T_k\}, \quad k = 1, 2, \ldots, N_T
+    \label{eq:tin_model}
+\end{equation}
+其中，$T_k$表示第$k$个三角形面片。
+
+TIN模型的优点是可以根据地形复杂度自适应调整采样密度，在地形平坦区域减少数据点，在地形复杂区域增加数据点。缺点是构建和查询算法相对复杂。
+
+\subsection{地形特征提取}
+\label{subsec:terrain_features}
+
+为支持巡视器的通过性分析和路径规划，需要从地形模型中提取关键特征参数。主要包括：
+
+\textbf{（1）坡度和坡向}
+
+坡度定义为地形表面的最大倾斜程度，计算公式为：
+\begin{equation}
+    \alpha = \arctan\sqrt{\left(\frac{\partial h}{\partial x}\right)^2 + \left(\frac{\partial h}{\partial y}\right)^2}
+    \label{eq:slope}
+\end{equation}
+
+坡向定义为坡面的法线在水平面上的投影方向：
+\begin{equation}
+    \beta = \arctan\left(\frac{\partial h / \partial y}{\partial h / \partial x}\right)
+    \label{eq:aspect}
+\end{equation}
+
+\textbf{（2）地形粗糙度}
+
+地形粗糙度反映地表起伏的复杂程度，采用高程标准差表示：
+\begin{equation}
+    R = \sqrt{\frac{1}{N}\sum_{i=1}^{N}(h_i - \bar{h})^2}
+    \label{eq:roughness}
+\end{equation}
+
+\textbf{（3）撞击坑识别}
+
+撞击坑是月面最典型的地形特征，采用模板匹配和边缘检测相结合的方法进行识别。撞击坑参数包括直径、深度、边缘高度、坡度等。
+
+\textbf{（4）岩石分布}
+
+基于遥感影像和地形数据，识别月面岩石的分布和大小。岩石识别采用深度学习方法，如Faster R-CNN、YOLO等目标检测算法。

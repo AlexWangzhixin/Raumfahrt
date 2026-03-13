@@ -1,0 +1,127 @@
+% ==================== 5.4 基于岩石识别的避障策略 ====================
+\section{基于岩石识别的避障策略}
+\label{sec:avoidance_strategy}
+
+基于增强型ORB-SLAM2系统获取的岩石位置和尺寸信息，本节设计避障策略。避障策略包括威胁评估、决策判断和路径重规划三个环节。
+
+\subsection{威胁评估}
+\label{subsec:threat_assessment}
+
+威胁评估的目的是判断岩石对巡视器行走安全的威胁程度。威胁程度与岩石的位置、尺寸、巡视器运动状态等因素相关。
+
+\textbf{（1）距离威胁}
+
+定义距离威胁函数：
+\begin{equation}
+    T_d = \begin{cases}
+        1, & d < d_{min} \\
+        \frac{d_{max} - d}{d_{max} - d_{min}}, & d_{min} \le d \le d_{max} \\
+        0, & d > d_{max}
+    \end{cases}
+    \label{eq:threat_distance}
+\end{equation}
+其中，$d$为巡视器到岩石的距离，$d_{min}$为最小安全距离，$d_{max}$为警戒距离。
+
+\textbf{（2）尺寸威胁}
+
+定义尺寸威胁函数：
+\begin{equation}
+    T_s = \begin{cases}
+        0, & s < s_{min} \\
+        \frac{s - s_{min}}{s_{max} - s_{min}}, & s_{min} \le s \le s_{max} \\
+        1, & s > s_{max}
+    \end{cases}
+    \label{eq:threat_size}
+\end{equation}
+其中，$s$为岩石尺寸，$s_{min}$为可越过尺寸，$s_{max}$为危险尺寸。
+
+\textbf{（3）运动威胁}
+
+考虑巡视器运动方向与岩石的相对位置：
+\begin{equation}
+    T_m = \max\left(0, \cos\theta\right)
+    \label{eq:threat_motion}
+\end{equation}
+其中，$\theta$为巡视器运动方向与岩石方向的夹角。
+
+\textbf{（4）综合威胁度}
+
+综合威胁度为上述威胁的加权和：
+\begin{equation}
+    T = w_d T_d + w_s T_s + w_m T_m
+    \label{eq:threat_total}
+\end{equation}
+其中，$w_d$, $w_s$, $w_m$为权重系数，满足$w_d + w_s + w_m = 1$。
+
+当$T > T_{threshold}$时，认为岩石构成威胁，需要进行避障。
+
+\subsection{避障决策}
+\label{subsec:avoidance_decision}
+
+避障决策根据威胁评估结果，选择合适的避障策略。
+
+\textbf{（1）停止策略}
+
+当威胁度极高且无法及时绕行时，采用停止策略：
+\begin{equation}
+    \text{Action} = \text{STOP}, \quad T > T_{critical}
+    \label{eq:strategy_stop}
+\end{equation}
+
+\textbf{（2）绕行策略}
+
+当威胁度中等且存在可通行路径时，采用绕行策略。绕行方向的选择考虑以下因素：
+\begin{itemize}
+    \item 绕行距离最短；
+    \item 绕行路径平整度最优；
+    \item 绕行路径无其他障碍。
+\end{itemize}
+
+绕行方向决策：
+\begin{equation}
+    \text{Direction} = \arg\min_{d \in \{L, R\}} \left\{C_d + \alpha \cdot R_d\right\}
+    \label{eq:strategy_detour}
+\end{equation}
+其中，$C_d$为绕行距离，$R_d$为路径粗糙度，$\alpha$为权重系数。
+
+\textbf{（3）越过策略}
+
+当岩石尺寸较小且巡视器具备越过能力时，采用越过策略：
+\begin{equation}
+    \text{Action} = \text{CROSS}, \quad s < s_{cross} \land \text{slope} < \theta_{max}
+    \label{eq:strategy_cross}
+\end{equation}
+
+\subsection{路径重规划}
+\label{subsec:path_replanning}
+
+根据避障决策结果，进行路径重规划。
+
+\textbf{（1）局部路径修正}
+
+当威胁度较低时，采用局部路径修正方法。在原路径基础上，根据岩石位置进行局部调整：
+\begin{equation}
+    \mathbf{P}_{new} = \mathbf{P}_{old} + \Delta\mathbf{P}
+    \label{eq:path_modify}
+\end{equation}
+
+路径修正采用人工势场法或模型预测控制（MPC）方法。
+
+\textbf{（2）全局路径重规划}
+
+当威胁度较高或局部修正无法满足要求时，进行全局路径重规划。采用A*或RRT算法重新规划从当前位置到目标点的路径。
+
+重规划时，将岩石标记为障碍区域，在代价地图中增加相应的代价值：
+\begin{equation}
+    C(x, y) = C_{base}(x, y) + C_{rock}(x, y)
+    \label{eq:cost_update}
+\end{equation}
+
+\textbf{（3）路径平滑}
+
+重规划后的路径需要进行平滑处理，确保运动连续性和舒适性。采用贝塞尔曲线或B样条曲线进行路径平滑：
+\begin{equation}
+    \mathbf{P}_{smooth}(t) = \sum_{i=0}^{n} B_i^n(t) \mathbf{P}_i
+    \label{eq:path_smooth}
+\end{equation}
+其中，$B_i^n(t)$为伯恩斯坦基函数，$\mathbf{P}_i$为控制点。

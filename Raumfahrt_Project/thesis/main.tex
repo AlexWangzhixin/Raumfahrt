@@ -1,0 +1,493 @@
+% !TEX program = xelatex
+% 博士学位论文 LaTeX 模板
+% 《面向月面巡视器自主行走数字孪生技术研究》
+
+\documentclass[12pt, a4paper, openany, twoside]{book}
+
+% ==================== 宏包引入 ====================
+% 注意：宏包加载顺序很重要！
+\usepackage{ctex}                          % 中文支持（必须首先加载）
+\usepackage{etoolbox}                        % 字体检测命令支持
+
+% ==================== 自定义字体设置 ====================
+% 华文行楷：Windows系统字体名为 STXingkai
+\IfFontExistsTF{STXingkai}{
+    \setCJKfamilyfont{hwxk}{STXingkai}
+}{
+    \setCJKfamilyfont{hwxk}{楷体}  % 备用字体
+}
+% 隶书：Windows系统字体名为 LiSu（ctex已定义\lishu，使用不同名称避免冲突）
+\IfFontExistsTF{LiSu}{
+    \setCJKfamilyfont{lisf}{LiSu}
+}{
+    \IfFontExistsTF{隶书}{
+        \setCJKfamilyfont{lisf}{隶书}
+    }{
+        \setCJKfamilyfont{lisf}{黑体}  % 备用字体
+    }
+}
+\newcommand{\huawenxingkai}{\CJKfamily{hwxk}}
+\newcommand{\lishufile}{\CJKfamily{lisf}}
+
+% Arial 字体（英文标题使用）
+\IfFontExistsTF{Arial}{
+    \newfontfamily\arial{Arial}
+}{
+    \newfontfamily\arial{Times New Roman}  % 备用
+}
+\usepackage{gensymb}                       % 度数符号等通用符号
+\usepackage{graphicx}                      % 图片支持
+\usepackage{amsmath, amssymb, amsfonts}    % 数学公式
+\usepackage{booktabs}                      % 三线表
+\usepackage{longtable}                     % 长表格
+\usepackage{multirow}                      % 表格合并行
+\usepackage{multicol}                      % 多栏排版
+\usepackage{listings}                      % 代码排版
+\usepackage{xcolor}                        % 颜色支持
+\usepackage{geometry}                      % 页面设置
+\usepackage{fancyhdr}                      % 页眉页脚
+\usepackage{titlesec}                      % 标题格式
+\usepackage{titletoc}                      % 图目录、表目录
+\usepackage{caption}                       % 图表标题格式
+\usepackage{subcaption}                    % 子图支持
+\usepackage{float}                         % 浮动体控制
+\usepackage{enumitem}                      % 列表格式
+\usepackage{tikz}                          % 绘图
+\usetikzlibrary{positioning, arrows.meta, shapes}  % TikZ库：定位、箭头、形状
+\usepackage{pgfplots}                      % 数据绘图
+\pgfplotsset{compat=1.18}                  % 指定pgfplots兼容版本
+\usepackage{threeparttable}                % 表格注释
+\usepackage{tabularx}                      % 自动列宽表格
+\usepackage{setspace}                      % 行距控制
+\usepackage{titletoc}                      % 目录格式控制
+\usepackage[ruled,linesnumbered]{algorithm2e}  % 算法排版（放在caption之后）
+
+% ==================== 参考文献引用设置 ====================
+% 使用natbib实现GB/T 7714-2015上角标引用样式
+% square: 方括号, super: 上角标, sort&compress: 压缩连续编号
+\usepackage[square,super,sort&compress]{natbib}
+
+% 参考文献标题格式重定义
+\renewcommand{\bibname}{参考文献}
+% 禁用natbib自动输出标题（在references.tex中手动定义）
+\renewcommand{\bibsection}{}
+% 参考文献序号格式：[1] 后接全角空格（使用\quad实现约一个汉字宽度）
+\makeatletter
+\renewcommand{\@biblabel}[1]{[#1]\quad}
+\makeatother
+
+% 确保数字编号样式
+\bibliographystyle{gbt7714-numerical}
+
+\usepackage{hyperref}                      % 超链接（必须最后加载）
+
+% ==================== 抑制自动生成的目录标题 ====================
+% 禁用 tableofcontents、listoffigures、listoftables 自动生成的标题
+\makeatletter
+\let\tableofcontents\@undefined
+\let\listoffigures\@undefined
+\let\listoftables\@undefined
+
+% 重新定义：不输出标题，直接输出列表内容
+\newcommand{\tableofcontents}{%
+  \@starttoc{toc}%
+}
+
+\newcommand{\listoffigures}{%
+  \@starttoc{lof}%
+}
+
+\newcommand{\listoftables}{%
+  \@starttoc{lot}%
+}
+\makeatother
+
+% ==================== 页面设置 ====================
+% 标准学位论文要求：A4纸张，上下2.5cm，左右2cm，页眉1.5cm，页脚1.75cm
+\geometry{
+    a4paper,
+    top=2.5cm,
+    bottom=2.5cm,
+    left=2.0cm,
+    right=2.0cm,
+    headheight=1.5cm,
+    headsep=0.4cm,     % 页眉与正文间距
+    footskip=1.75cm
+}
+
+% ==================== 页眉页脚设置 ====================
+% 正文页眉样式（fancy）：宋体五号居中，带横线
+\fancypagestyle{fancy}{
+    \fancyhf{}
+    \fancyhead[C]{\songti\zihao{5} 航天工程大学博士学位论文}
+    \fancyfoot[C]{\rmfamily\zihao{5} \thepage}
+    \renewcommand{\headrule}{%
+        \vskip 3pt
+        \hrule height 0.5pt width \headwidth
+    }
+}
+
+% 章节标题页样式（plain）：与fancy样式完全一致
+\fancypagestyle{plain}{
+    \fancyhf{}
+    \fancyhead[C]{\songti\zihao{5} 航天工程大学博士学位论文}
+    \fancyfoot[C]{\rmfamily\zihao{5} \thepage}
+    \renewcommand{\headrule}{%
+        \vskip 3pt
+        \hrule height 0.5pt width \headwidth
+    }
+}
+
+% 默认使用fancy样式
+\pagestyle{fancy}
+
+% 前言页（摘要、目录）使用frontpage样式：无页眉横线，页脚居中显示大写罗马数字页码
+\fancypagestyle{frontpage}{
+    \fancyhf{}
+    \fancyfoot[C]{\rmfamily\zihao{5} \thepage}
+    \renewcommand{\headrulewidth}{0pt}
+    \renewcommand{\headrule}{}
+}
+
+% ==================== 章节标题格式设置 ====================
+% 一级标题（章）- 黑体小二加粗，单倍行距
+\titleformat{\chapter}
+    {\heiti\bfseries\zihao{-2}\raggedright}
+    {\thechapter\ }
+    {0pt}
+    {}
+% 段前间距缩小，使章节标题与页眉横线间距紧凑美观
+\titlespacing*{\chapter}{0pt}{0pt}{0pt}
+
+% 二级标题（节）- 黑体小三号，固定行距20磅，段前0.5行，段后0.5行
+\titleformat{\section}
+    {\heiti\bfseries\zihao{-3}\raggedright}
+    {\thesection\ }
+    {0.5em}
+    {}
+\titlespacing*{\section}{0pt}{0.5\baselineskip}{0.5\baselineskip}
+
+% 三级标题 - 黑体四号，固定行距20磅，段前0.5行，段后0.5行
+\titleformat{\subsection}
+    {\heiti\bfseries\zihao{4}\raggedright}
+    {\thesubsection\ }
+    {0.5em}
+    {}
+\titlespacing*{\subsection}{0pt}{0.5\baselineskip}{0.5\baselineskip}
+
+% 四级标题 - 黑体小四号
+\titleformat{\subsubsection}
+    {\heiti\bfseries\zihao{-4}\raggedright}
+    {\thesubsubsection\ }
+    {0.5em}
+    {}
+\titlespacing*{\subsubsection}{0pt}{0.5\baselineskip}{0.5\baselineskip}
+
+% 标题编号格式
+\renewcommand{\thesection}{\arabic{chapter}.\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
+
+% ==================== 图表标题格式设置（附件1-8、1-9） ====================
+% 图标题格式：图 X-X 标题内容（宋体小四号，图号加粗）
+\captionsetup[figure]{
+    font={small},
+    labelfont={bf},
+    textfont={},
+    name=图,
+    labelsep=quad,
+    format=hang,
+    justification=centering
+}
+
+% 表标题格式：表 X-X 标题内容（宋体小四号，表号加粗）
+\captionsetup[table]{
+    font={small},
+    labelfont={bf},
+    textfont={},
+    name=表,
+    labelsep=quad,
+    format=hang,
+    justification=centering
+}
+
+% ========== 关键修改：将 1.1 改为 1-1 ==========
+\renewcommand{\thefigure}{\thechapter-\arabic{figure}}
+\renewcommand{\thetable}{\thechapter-\arabic{table}}
+\renewcommand{\theequation}{\thechapter-\arabic{equation}}
+
+% 图表编号按章重置
+\makeatletter
+\@addtoreset{figure}{chapter}
+\@addtoreset{table}{chapter}
+\@addtoreset{equation}{chapter}
+\makeatother
+
+
+
+
+% ==================== 正文格式设置 ====================
+% 中文正文：宋体小四号（ctex默认）
+% 英文/数字：Times New Roman小四号（ctex默认）
+% 行距固定20磅
+\linespread{1.25}\selectfont  % 约20磅行距
+
+% 正文段落格式
+\setlength{\parindent}{2em}    % 首行缩进2字符
+\setlength{\parskip}{0pt}      % 段落间距
+
+% ==================== 目录设置（附件1-6、1-8、1-9） ====================
+\setcounter{tocdepth}{3}
+\setcounter{secnumdepth}{3}
+
+% 目录标题格式 - 黑体三号居中
+\renewcommand{\contentsname}{目\quad 录}
+\renewcommand{\listfigurename}{图\quad 目\quad 录}
+\renewcommand{\listtablename}{表\quad 目\quad 录}
+
+% ==================== 禁用章节间的目录额外间距 ====================
+% 在读取目录文件时禁用 \addvspace
+\makeatletter
+% 重定义 \listoffigures 和 \listoftables，禁用 \addvspace
+\renewcommand{\listoffigures}{%
+  \let\oldaddvspace\addvspace
+  \renewcommand{\addvspace}[1]{}%
+  \@starttoc{lof}%
+  \let\addvspace\oldaddvspace
+}
+\renewcommand{\listoftables}{%
+  \let\oldaddvspace\addvspace
+  \renewcommand{\addvspace}[1]{}%
+  \@starttoc{lot}%
+  \let\addvspace\oldaddvspace
+}
+% 重定义 \l@figure 和 \l@table
+\renewcommand*{\l@figure}{\@dottedtocline{1}{1.5em}{2.3em}}
+\renewcommand*{\l@table}{\@dottedtocline{1}{1.5em}{2.3em}}
+\makeatother
+
+% 定义目录行距命令
+\newcommand{\tocline}{\par\vspace{0pt plus.2pt}\par}
+
+% 章节目录格式 - 黑体小四号，固定20磅行距
+\titlecontents{chapter}[0em]
+    {\heiti\zihao{-4}\linespread{1.25}\selectfont}
+    {\thecontentslabel\quad}
+    {\hspace*{0pt}}
+    {\dotfill\contentspage}
+
+% 二级标题格式 - 宋体小四号
+\titlecontents{section}[2em]
+    {\songti\zihao{-4}\linespread{1.25}\selectfont}
+    {\thecontentslabel\quad}
+    {\hspace*{0pt}}
+    {\dotfill\contentspage}
+
+% 三级标题格式 - 宋体小四号
+\titlecontents{subsection}[4em]
+    {\songti\zihao{-4}\linespread{1.25}\selectfont}
+    {\thecontentslabel\quad}
+    {\hspace*{0pt}}
+    {\dotfill\contentspage}
+
+% 图目录格式 - 宋体小四号
+\titlecontents{figure}[0em]
+    {\songti\zihao{-4}\linespread{1.25}\selectfont}
+    {图\thecontentslabel\quad}
+    {\hspace*{0pt}}
+    {\dotfill\contentspage}
+
+% 表目录格式 - 宋体小四号
+\titlecontents{table}[0em]
+    {\songti\zihao{-4}\linespread{1.25}\selectfont}
+    {表\thecontentslabel\quad}
+    {\hspace*{0pt}}
+    {\dotfill\contentspage}
+
+
+
+    
+
+% ==================== 算法格式设置 ====================
+\SetKwInput{KwIn}{输入}
+\SetKwInput{KwOut}{输出}
+\SetAlgorithmName{算法}{算法}{算法列表}
+\SetAlCapSkip{1em}
+
+% ==================== 代码格式设置 ====================
+\lstset{
+    basicstyle=\small\ttfamily,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{white},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    tabsize=4,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false,
+    escapeinside={\%*}{*)},
+    xleftmargin=2em,
+    xrightmargin=2em
+}
+
+% ==================== 超链接设置 ====================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=blue,
+    urlcolor=blue,
+    pdfauthor={作者姓名},
+    pdftitle={面向月面巡视器自主行走数字孪生技术研究},
+    pdfsubject={博士学位论文},
+    pdfkeywords={月面巡视器, 数字孪生, 自主行走, 路径规划}
+}
+
+% ==================== 文档信息 ====================
+% 封面信息
+\newcommand{\thesistitle}{面向月面巡视器自主行走数字孪生技术研究}
+\newcommand{\thesistitleen}{Research on Digital Twin Technology for Autonomous Navigation of Lunar Rover}
+\newcommand{\thesistitleenupper}{RESEARCH ON DIGITAL TWIN TECHNOLOGY FOR AUTONOMOUS LUNAR ROVER LOCOMOTION}
+\newcommand{\authorname}{作者姓名}
+\newcommand{\supervisor}{导师姓名\quad 教授}
+\newcommand{\degreename}{博士}
+\newcommand{\major}{航空宇航科学与技术}
+\newcommand{\institute}{航天工程大学}
+\newcommand{\thesisdate}{2026年07月}
+
+% 封面顶部信息
+\newcommand{\studentid}{202509010808015}      % 学号
+\newcommand{\schoolcode}{91036}                % 学校代码
+\newcommand{\classification}{TP391}            % 中图分类号
+\newcommand{\secretlevel}{公开}                % 密级
+
+% 提名页额外信息
+\newcommand{\researchdirection}{航天信息处理与应用}  % 研究方向
+
+% ==================== 正文开始 ====================
+\begin{document}
+
+% 封面页开始设置页码（不显示，用于计数）
+\pagenumbering{roman}
+
+% ------------------ 封面 ------------------
+\include{chapters/cover}
+
+% ------------------ 副封面 ------------------
+\include{chapters/subcover}
+
+% ------------------ 声明页 ------------------
+\include{chapters/authorization}
+
+% ------------------ 摘要 ------------------
+\include{chapters/abstract}
+
+% ------------------ 目录 ------------------
+% 继续使用大写罗马数字（不重置）
+\pagestyle{frontpage}
+
+% ==================== 目录标题页 ====================
+\thispagestyle{frontpage}
+\begin{center}
+{\heiti\zihao{-2} 目\quad 录}
+\end{center}
+
+\vspace{0.5\baselineskip}
+
+% 设置行距为固定20磅
+\songti\zihao{-4}
+\setlength{\baselineskip}{20pt}
+
+% 生成目录
+\addcontentsline{toc}{chapter}{目\quad 录}
+\tableofcontents
+
+\newpage
+\thispagestyle{frontpage}
+
+% ==================== 图目录 ====================
+\thispagestyle{frontpage}
+\begin{center}
+{\heiti\zihao{-2} 图\quad 目\quad 录}
+\end{center}
+
+\vspace{0.5\baselineskip}
+
+% 设置行距为固定20磅
+\songti\zihao{-4}
+\setlength{\baselineskip}{20pt}
+
+% 直接生成图目录
+\addcontentsline{toc}{chapter}{图\quad 目\quad 录}
+\thispagestyle{frontpage}
+\listoffigures
+
+\newpage
+\thispagestyle{frontpage}
+
+% ==================== 表目录 ====================
+\thispagestyle{frontpage}
+\begin{center}
+{\heiti\zihao{-2} 表\quad 目\quad 录}
+\end{center}
+
+\vspace{0.5\baselineskip}
+
+% 设置行距为固定20磅
+\songti\zihao{-4}
+\setlength{\baselineskip}{20pt}
+
+% 直接生成表目录
+\addcontentsline{toc}{chapter}{表\quad 目\quad 录}
+\thispagestyle{frontpage}
+\listoftables
+
+\newpage
+
+% ------------------ 正文部分 ------------------
+\mainmatter
+\pagestyle{fancy}  % 正文使用fancy页眉样式（带横线）
+
+% 第1章 绪论
+\include{chapters/ch1/chapter1}
+
+% 第2章 基于增强五维模型的月面巡视器自主行走数字孪生框架
+\include{chapters/ch2/chapter2}
+
+% 第3章 月面环境数字孪生建模与仿真
+\include{chapters/ch3/chapter3}
+
+% 第4章 月面巡视器动力学数字孪生建模
+\include{chapters/ch4/chapter4}
+
+% 第5章 基于数字孪生的月面岩石识别与避障
+\include{chapters/ch5/chapter5}
+
+% 第6章 基于数字孪生的巡视器路径规划
+\include{chapters/ch6/chapter6}
+
+% 第7章 总结与展望
+\include{chapters/ch7/chapter7}
+
+% ------------------ 附录 ------------------
+\appendix
+\include{appendix}
+
+% ------------------ 参考文献 ------------------
+\backmatter
+\include{chapters/references}
+
+% ------------------ 致谢 ------------------
+\include{chapters/acknowledgements}
+
+% ------------------ 作者简历（附件1-14） ------------------
+\include{chapters/resume}
+
+\end{document}

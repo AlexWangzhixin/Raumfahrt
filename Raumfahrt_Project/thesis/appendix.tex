@@ -1,0 +1,162 @@
+% ==================== 附录 ====================
+\chapter{附录}
+\label{chap:appendix}
+
+\section{月面巡视器主要参数}
+\label{sec:rover_params}
+
+表\ref{tab:rover_params}列出了典型月面巡视器的主要参数。
+
+\begin{longtable}{lcc}
+    \caption{月面巡视器主要参数} \label{tab:rover_params} \\
+    \toprule
+    参数名称 & 参数值 & 单位 \\
+    \midrule
+    \endfirsthead
+    \multicolumn{3}{c}{\tablename\ \thetable{} -- 续表} \\
+    \toprule
+    参数名称 & 参数值 & 单位 \\
+    \midrule
+    \endhead
+    \midrule
+    \multicolumn{3}{r}{续下页} \\
+    \endfoot
+    \bottomrule
+    \endlastfoot
+    
+    \textbf{几何参数} & & \\
+    车身长度 & 1.5 & m \\
+    车身宽度 & 1.0 & m \\
+    车身高度 & 1.1 & m \\
+    车轮直径 & 0.3 & m \\
+    车轮宽度 & 0.2 & m \\
+    轮距 & 1.2 & m \\
+    轴距 & 1.0 & m \\
+    
+    \textbf{质量参数} & & \\
+    整车质量 & 140 & kg \\
+    有效载荷 & 20 & kg \\
+    
+    \textbf{运动参数} & & \\
+    最大速度 & 0.2 & m/s \\
+    最大爬坡角度 & 25 & \degree \\
+    最小转弯半径 & 0.5 & m \\
+    
+    \textbf{能源参数} & & \\
+    太阳能电池功率 & 150 & W \\
+    蓄电池容量 & 50 & Ah \\
+    
+\end{longtable}
+
+\section{月壤力学参数参考值}
+\label{sec:soil_params}
+
+表\ref{tab:soil_params_appendix}列出了月壤力学参数的参考值。
+
+\begin{table}[htbp]
+    \centering
+    \caption{月壤力学参数参考值}
+    \label{tab:soil_params_appendix}
+    \begin{tabular}{lccc}
+        \toprule
+        参数名称 & 符号 & 参考值范围 & 单位 \\
+        \midrule
+        内聚力 & $c$ & 0.1--3.0 & kPa \\
+        内摩擦角 & $\phi$ & 30--50 & \degree \\
+        弹性模量 & $E$ & 10--100 & MPa \\
+        泊松比 & $\nu$ & 0.2--0.4 & - \\
+        密度 & $\rho$ & 1100--1800 & kg/m³ \\
+        孔隙率 & $n$ & 40--50 & \% \\
+        贝克沉陷模量 & $k_c$ & 0.5--2.0 & kN/m$^{n+1}$ \\
+        贝克沉陷模量 & $k_\phi$ & 500--3000 & kN/m$^{n+2}$ \\
+        沉陷指数 & $n$ & 0.8--1.2 & - \\
+        剪切模量 & $K$ & 0.01--0.05 & m \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section{算法伪代码}
+\label{sec:algorithm}
+
+\subsection{A-D3QN算法伪代码}
+
+\begin{algorithm}[H]
+    \SetAlgoLined
+    \KwIn{环境$E$，神经网络$Q$，目标网络$Q_{target}$，经验池$D$}
+    \KwOut{训练好的策略网络}
+    
+    初始化网络参数$\theta$和目标网络参数$\theta_{target} \leftarrow \theta$\;
+    初始化经验池$D$\;
+    
+    \For{episode = 1 to $M$}{
+        初始化环境状态$s_0$\;
+        
+        \For{$t = 1$ to $T$}{
+            以概率$\epsilon$随机选择动作$a_t$，否则$a_t = \arg\max_a Q(s_t, a; \theta)$\;
+            执行动作$a_t$，观察奖励$r_t$和新状态$s_{t+1}$\;
+            存储$(s_t, a_t, r_t, s_{t+1})$到经验池$D$\;
+            
+            从$D$中采样小批量数据$(s_i, a_i, r_i, s'_i)$\;
+            
+            计算目标Q值：
+            $y_i = r_i + \gamma Q_{target}(s'_i, \arg\max_{a'} Q(s'_i, a'; \theta); \theta_{target})$\;
+            
+            计算损失：
+            $L(\theta) = \frac{1}{N}\sum_i (y_i - Q(s_i, a_i; \theta))^2$\;
+            
+            梯度下降更新$\theta$\;
+            
+            每隔$C$步更新目标网络：$\theta_{target} \leftarrow \theta$\;
+        }
+    }
+    \Return 训练好的网络参数$\theta$\;
+    \caption{A-D3QN训练算法}
+    \label{alg:ad3qn}
+\end{algorithm}
+
+\section{主要符号说明}
+\label{sec:symbols}
+
+表\ref{tab:symbols}列出了论文中使用的主要符号及其含义。
+
+\begin{longtable}{cl}
+    \caption{主要符号说明} \label{tab:symbols} \\
+    \toprule
+    符号 & 含义 \\
+    \midrule
+    \endfirsthead
+    \multicolumn{2}{c}{\tablename\ \thetable{} -- 续表} \\
+    \toprule
+    符号 & 含义 \\
+    \midrule
+    \endhead
+    \midrule
+    \multicolumn{2}{r}{续下页} \\
+    \endfoot
+    \bottomrule
+    \endlastfoot
+    
+    $z$ & 沉陷深度 \\
+    $W$ & 垂直载荷 \\
+    $D$ & 车轮直径 \\
+    $b$ & 车轮宽度 \\
+    $k_c, k_\phi$ & 贝克沉陷模量 \\
+    $n$ & 沉陷指数 \\
+    $c$ & 内聚力 \\
+    $\phi$ & 内摩擦角 \\
+    $K$ & 剪切模量 \\
+    $i$ & 滑移率 \\
+    $\alpha$ & 坡度角 \\
+    $h$ & 太阳高度角 \\
+    $I$ & 太阳辐照度 \\
+    $T$ & 温度 \\
+    $\rho$ & 密度 \\
+    $E$ & 弹性模量 \\
+    $\mathbf{q}$ & 广义坐标 \\
+    $\mathbf{M}$ & 质量矩阵 \\
+    $\mathbf{J}$ & 雅可比矩阵 \\
+    $Q(s,a)$ & 状态-动作价值函数 \\
+    $\gamma$ & 折扣因子 \\
+    $\theta$ & 神经网络参数 \\
+    
+\end{longtable}

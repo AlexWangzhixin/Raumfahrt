@@ -1,0 +1,105 @@
+% ==================== 3.3 月壤环境数字孪生建模 ====================
+\section{月壤环境数字孪生建模}
+\label{sec:soil_modeling}
+
+月壤环境数字孪生建模的目标是建立月壤力学特性的数字化描述，为巡视器轮-壤相互作用分析和行走性能预测提供支撑。本节从月壤物理特性、力学本构模型、参数分布建模三个方面展开研究。
+
+\subsection{月壤物理特性分析}
+\label{subsec:soil_properties}
+
+月壤是覆盖在月球基岩之上的松散物质层，由微陨石撞击、热循环、太阳风等因素长期作用形成。月壤的主要物理特性包括：
+
+\textbf{（1）颗粒组成}
+
+月壤颗粒粒径分布广泛，从亚微米级到厘米级均有分布。典型月壤的粒径分布如表\ref{tab:soil_grain}所示。
+
+\begin{table}[htbp]
+    \centering
+    \caption{典型月壤粒径分布}
+    \label{tab:soil_grain}
+    \begin{tabular}{ccc}
+        \toprule
+        粒径范围（mm） & 质量占比（\%） & 特征描述 \\
+        \midrule
+        $<0.02$ & 10-20 & 细颗粒，易悬浮 \\
+        $0.02-0.1$ & 30-40 & 中等颗粒 \\
+        $0.1-1.0$ & 30-50 & 粗颗粒 \\
+        $1.0-10.0$ & 5-15 & 砾石 \\
+        $>10.0$ & $<5$ & 岩石碎块 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{（2）颗粒形状}
+
+月壤颗粒棱角分明，形状不规则。这是由于月球缺乏大气和水流的磨蚀作用，颗粒保持原始破碎形态。颗粒形状影响月壤的力学特性，如内摩擦角和内聚力。
+
+\textbf{（3）密度分布}
+
+月壤密度随深度增加而增大，这是由于上层月壤受微陨石撞击扰动较为松散，下层月壤在重力作用下逐渐压实。典型月壤密度分布可表示为：
+\begin{equation}
+    \rho(z) = \rho_0 \cdot (1 - e^{-z/z_0})
+    \label{eq:soil_density}
+\end{equation}
+其中，$\rho_0$为极限密度（约1.8-2.0 g/cm³），$z_0$为特征深度（约5-10 cm）。
+
+\textbf{（4）孔隙率}
+
+月壤孔隙率较高，表层孔隙率可达40-50\%。孔隙率影响月壤的压缩性和渗透性。
+
+\subsection{月壤力学本构模型}
+\label{subsec:soil_constitutive}
+
+月壤的力学行为可用本构模型描述。常用的本构模型包括弹性模型、弹塑性模型和离散元模型。
+
+\textbf{（1）弹性模型}
+
+在较小应变条件下，月壤可近似为弹性材料。应力-应变关系为：
+\begin{equation}
+    \sigma = E \cdot \varepsilon
+    \label{eq:elastic}
+\end{equation}
+其中，$E$为弹性模量，典型值为10-100 MPa。
+
+\textbf{（2）Drucker-Prager弹塑性模型}
+
+Drucker-Prager模型适合描述颗粒材料的塑性屈服行为。屈服准则为：
+\begin{equation}
+    F = \alpha I_1 + \sqrt{J_2} - k = 0
+    \label{eq:dp_yield}
+\end{equation}
+其中，$I_1$为应力张量第一不变量，$J_2$为偏应力张量第二不变量，$\alpha$和$k$为材料参数，与内聚力$c$和内摩擦角$\phi$相关：
+\begin{equation}
+    \alpha = \frac{2\sin\phi}{\sqrt{3}(3-\sin\phi)}, \quad k = \frac{6c\cos\phi}{\sqrt{3}(3-\sin\phi)}
+    \label{eq:dp_params}
+\end{equation}
+
+月壤的内聚力$c$通常为0-3 kPa，内摩擦角$\phi$为30-50\degree。
+
+\textbf{（3）离散元模型}
+
+离散元方法（DEM）将月壤离散为大量颗粒单元，通过接触力学计算颗粒间的相互作用。DEM可以捕捉月壤的细观力学行为，如颗粒重排、局部剪切等。
+
+接触力采用Hertz-Mindlin模型计算：
+\begin{equation}
+    F_n = \frac{4}{3}E^*\sqrt{R^*}\delta_n^{3/2}
+    \label{eq:hertz}
+\end{equation}
+其中，$E^*$为等效弹性模量，$R^*$为等效半径，$\delta_n$为法向重叠量。
+
+\subsection{月壤参数空间分布建模}
+\label{subsec:soil_distribution}
+
+月壤力学参数具有空间变异性，需要建立参数分布模型。主要方法包括：
+
+\textbf{（1）基于遥感数据的反演}
+
+利用遥感影像、雷达数据等反演月壤参数。如利用雷达回波强度估计月壤密度，利用热辐射特性估计月壤热导率。
+
+\textbf{（2）基于地质统计学的插值}
+
+利用地质统计学方法（如克里金插值）对离散的月壤参数数据进行空间插值，获得连续的参数分布场。
+
+\textbf{（3）基于机器学习的预测}
+
+利用深度学习方法建立月壤参数与地形、地质特征之间的映射关系，实现参数分布的预测。如利用卷积神经网络从地形特征预测月壤密度分布。

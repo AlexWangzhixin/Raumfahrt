@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>封面顶部信息栏</title>
+    <link rel="stylesheet" href="cover-header.css">
+    <style>
+        /* 页面基础样式 */
+        body {
+            margin: 0;
+            padding: 40px;
+            font-family: "SimSun", "宋体", serif;
+            background-color: #f5f5f5;
+        }
+        
+        /* A4纸张模拟容器 */
+        .a4-container {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 20mm;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+        }
+        
+        /* 标题样式 */
+        h2 {
+            text-align: center;
+            margin-top: 40px;
+            font-family: "SimHei", "黑体", sans-serif;
+            font-size: 22px;
+        }
+    </style>
+</head>
+<body>
+    <div class="a4-container">
+        <!-- 顶部信息栏 -->
+        <div class="cover-header">
+            <div class="header-left">
+                <div class="info-item">
+                    <span class="label-left">学&emsp;&emsp;号</span>
+                    <span class="underline underline-student-id">202509010808015</span>
+                </div>
+                <div class="info-item">
+                    <span class="label-left">中图分类号</span>
+                    <span class="underline underline-classification">TP391</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="info-item">
+                    <span class="label-right">学校代码</span>
+                    <span class="underline underline-school-code">91036</span>
+                </div>
+                <div class="info-item">
+                    <span class="label-right">密&emsp;&emsp;级</span>
+                    <span class="underline underline-secret">公开</span>
+                </div>
+            </div>
+        </div>
+        
+        <h2>航天工程大学</h2>
+    </div>
+</body>
+</html>

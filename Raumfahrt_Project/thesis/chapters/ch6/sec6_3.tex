@@ -1,0 +1,193 @@
+% ==================== 6.3 基于A-D3QN的混合路径规划算法 ====================
+\section{基于A-D3QN的混合路径规划算法}
+\label{sec:ad3qn}
+
+针对月面复杂环境下的路径规划问题，本节提出基于注意力机制增强的双深度Q网络（A-D3QN, Attention-based Double Deep Q-Network）的混合路径规划算法。该算法结合了全局规划的最优性和局部规划的灵活性，实现高效、安全的路径生成。
+
+\subsection{深度强化学习基础}
+\label{subsec:drl_base}
+
+深度强化学习（DRL）将深度学习的感知能力与强化学习的决策能力相结合，适合处理复杂环境下的决策问题。
+
+\textbf{（1）马尔可夫决策过程}
+
+路径规划问题可建模为马尔可夫决策过程（MDP），定义为五元组$(S, A, P, R, \gamma)$：
+\begin{itemize}
+    \item $S$：状态空间，表示巡视器的状态（位置、姿态、速度等）；
+    \item $A$：动作空间，表示巡视器可执行的动作（前进、转向、停止等）；
+    \item $P$：状态转移概率，$P(s'|s,a)$表示在状态$s$执行动作$a$后转移到状态$s'$的概率；
+    \item $R$：奖励函数，$R(s,a)$表示在状态$s$执行动作$a$获得的奖励；
+    \item $\gamma$：折扣因子，$0 \le \gamma < 1$。
+\end{itemize}
+
+\textbf{（2）Q学习}
+
+Q学习是一种值函数方法，通过学习动作价值函数$Q(s,a)$来选择最优策略。Q函数的Bellman方程为：
+\begin{equation}
+    Q(s,a) = R(s,a) + \gamma \max_{a'} Q(s',a')
+    \label{eq:q_learning}
+\end{equation}
+
+\textbf{（3）深度Q网络（DQN）}
+
+DQN使用神经网络逼近Q函数，解决了传统Q学习的维度灾难问题。DQN的关键技术包括：
+\begin{itemize}
+    \item 经验回放：存储历史经验，随机采样训练，打破数据相关性；
+    \item 目标网络：使用独立的目标网络计算目标Q值，提高训练稳定性。
+\end{itemize}
+
+\subsection{A-D3QN算法设计}
+\label{subsec:ad3qn_design}
+
+针对传统DQN存在的问题，本节提出A-D3QN算法，主要改进包括：
+
+\textbf{（1）Double DQN结构}
+
+传统DQN使用最大值操作估计目标Q值，容易导致过高估计。Double DQN\cite{ref35}将动作选择和动作评估分离：
+\begin{equation}
+    Q_{target} = r + \gamma Q_{target}(s', \arg\max_{a'} Q(s', a'))
+    \label{eq:double_dqn}
+\end{equation}
+
+\textbf{（2）Dueling网络结构}
+
+Dueling DQN\cite{ref51}将Q函数分解为状态价值和动作优势：
+\begin{equation}
+    Q(s,a) = V(s) + A(s,a) - \frac{1}{|A|}\sum_{a'}A(s,a')
+    \label{eq:dueling}
+\end{equation}
+这种结构可以更快地学习状态价值，提高学习效率。
+
+\textbf{（3）注意力机制增强}
+
+引入注意力机制\cite{ref52}增强网络对关键信息的感知能力。注意力权重计算：
+\begin{equation}
+    \alpha_i = \frac{\exp(e_i)}{\sum_{j=1}^{n}\exp(e_j)}
+    \label{eq:attention}
+\end{equation}
+其中，$e_i$为注意力分数。
+
+注意力机制的引入使网络能够自适应地关注对决策影响较大的环境因素，如障碍物、坡度等。
+
+\textbf{（4）网络结构}
+
+A-D3QN的网络结构如图\ref{fig:ad3qn}所示。
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        scale=0.75,
+        transform shape,
+        block/.style={rectangle, draw, fill=blue!10, text width=2.5cm, text centered, minimum height=0.8cm, font=\small}
+    ]
+        \node[block] (input) at (0, 0) {状态输入};
+        \node[block] (conv) at (0, 1.5) {卷积层};
+        \node[block] (attn) at (0, 3) {注意力层};
+        \node[block] (fc) at (0, 4.5) {全连接层};
+        \node[block] (value) at (-2, 6) {状态价值$V$};
+        \node[block] (adv) at (2, 6) {动作优势$A$};
+        \node[block] (output) at (0, 7.5) {Q值输出};
+        
+        \draw[->, thick] (input) -- (conv);
+        \draw[->, thick] (conv) -- (attn);
+        \draw[->, thick] (attn) -- (fc);
+        \draw[->, thick] (fc) -- (value);
+        \draw[->, thick] (fc) -- (adv);
+        \draw[->, thick] (value) -- (output);
+        \draw[->, thick] (adv) -- (output);
+    \end{tikzpicture}
+    \caption{A-D3QN网络结构}
+    \label{fig:ad3qn}
+\end{figure}
+
+\subsection{混合路径规划策略}
+\label{subsec:hybrid_planning}
+
+结合全局规划和局部规划的优势，设计混合路径规划策略。
+
+\textbf{（1）全局规划}
+
+全局规划采用改进的A*算法，在代价地图上搜索最优路径。A*算法的代价函数为：
+\begin{equation}
+    f(n) = g(n) + h(n)
+    \label{eq:astar}
+\end{equation}
+其中，$g(n)$为从起点到节点$n$的实际代价，$h(n)$为从节点$n$到目标的启发式估计。
+
+改进包括：
+\begin{itemize}
+    \item 使用Theta*算法支持任意角度路径；
+    \item 引入动力学约束进行路径平滑；
+    \item 采用多分辨率搜索提高效率。
+\end{itemize}
+
+\textbf{（2）局部规划}
+
+局部规划采用A-D3QN算法，根据实时环境信息选择最优动作。状态空间包括：
+\begin{itemize}
+    \item 巡视器状态：位置、姿态、速度；
+    \item 环境状态：局部地形、障碍物分布；
+    \item 任务状态：到目标点的距离、方向。
+\end{itemize}
+
+动作空间包括：
+\begin{itemize}
+    \item 前进速度：$\{v_1, v_2, v_3\}$，分别为慢速、中速、快速；
+    \item 转向角度：$\{-30\degree, -15\degree, 0\degree, 15\degree, 30\degree\}$；
+    \item 停止。
+\end{itemize}
+
+奖励函数设计：
+\begin{equation}
+    r = r_{goal} + r_{collision} + r_{smooth} + r_{energy}
+    \label{eq:reward}
+\end{equation}
+
+其中：
+\begin{itemize}
+    \item $r_{goal}$：接近目标的奖励；
+    \item $r_{collision}$：碰撞惩罚；
+    \item $r_{smooth}$：路径平滑度奖励；
+    \item $r_{energy}$：能耗奖励。
+\end{itemize}
+
+\textbf{（3）全局-局部协同}
+
+全局路径为局部规划提供引导，局部规划对全局路径进行动态修正。协同机制：
+
+\begin{enumerate}
+    \item 全局规划生成路径点序列$\{p_1, p_2, \ldots, p_n\}$；
+    \item 局部规划选择最近的路径点$p_k$作为局部目标；
+    \item A-D3QN根据局部环境和目标选择动作；
+    \item 当偏离全局路径超过阈值时，触发全局重规划。
+\end{enumerate}
+
+\subsection{训练与优化}
+\label{subsec:training}
+
+\textbf{（1）训练环境}
+
+在数字孪生仿真环境中进行训练，环境包括：
+\begin{itemize}
+    \item 地形：根据月面DEM生成；
+    \item 障碍物：随机生成岩石、撞击坑等；
+    \item 动力学：使用第4章建立的模型。
+\end{itemize}
+
+\textbf{（2）训练参数}
+
+\begin{itemize}
+    \item 学习率：$\alpha = 10^{-4}$
+    \item 折扣因子：$\gamma = 0.99$
+    \item 经验池大小：$10^6$
+    \item 批次大小：64
+    \item 探索策略：$\epsilon$-greedy，$\epsilon$从1.0衰减到0.1
+\end{itemize}
+
+\textbf{（3）优化技术}
+
+\begin{itemize}
+    \item 优先经验回放：根据TD误差优先采样重要经验；
+    \item 梯度裁剪：限制梯度范数，防止梯度爆炸；
+    \item 目标网络软更新：$\theta_{target} \leftarrow \tau\theta + (1-\tau)\theta_{target}$
+\end{itemize}

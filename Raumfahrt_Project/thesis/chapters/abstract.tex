@@ -1,0 +1,95 @@
+% ==================== 中文摘要 ====================
+\label{chapter:abstract}
+% 设置页码为大写罗马数字（从摘要页开始）
+\pagenumbering{Roman}
+% 使用 frontpage 样式（无页眉，页脚居中显示页码）
+\pagestyle{frontpage}
+
+% 添加到目录（在标题之前，记录正确页码）
+\addcontentsline{toc}{chapter}{摘\quad 要}
+
+% 标题：黑体小二号加粗居中
+\begin{center}
+\heiti\bfseries\zihao{-2} 摘\quad 要
+\end{center}
+
+\vspace{0.5\baselineskip}
+
+% 正文：宋体小四号，行距固定值20磅
+\songti\zihao{-4}
+\setstretch{1.0}
+\linespread{1.5}\selectfont
+\setlength{\parindent}{2em}
+
+随着月球探测迈向以科研站建设、多器协同为核心的新阶段，月面巡视器成为开展月面活动、执行月面任务的核心工具。传统基于"地面遥操作+静态地图"的月球车自主行走模式，在应对月面复杂、不确定的非结构化环境时，存在感知滞后、规划僵化与响应迟缓等固有局限，难以满足实时自主行走需求。数字孪生技术通过构建虚实深度融合、双向实时交互的平行系统，为实现巡视器从"远程操控"到"自主引导"的模式变革提供了关键路径。现有航天数字孪生多侧重于状态监测与事后复盘，在从"静态镜像"到"动态引导"的提升中，面临跨尺度环境建模精度低、实时感知不可靠、以及动态环境中全局与局部规划难协同等问题。鉴于此，本文系统性地开展了面向月面巡视器自主行走的数字孪生技术研究，旨在突破覆盖"建模-感知-决策"的业务框架关键技术，具体内容包括：
+
+1. 提出了面向月面巡视器自主行走的增强数字孪生五维模型 EDT-FARM 框架。该理论框架在经典模型基础上，强化了虚拟实体的实时推演预测能力、孪生服务的在线决策支持功能以及孪生数据的闭环流动，设计了增强五维模型的实现架构，为后续关键技术研究提供了统一的理论指导。
+
+2. 针对跨尺度环境建模的难题，提出了自适应尺度几何-语义融合重建（AdaScale-GSFR）算法。该算法通过引入自适应尺度注意力机制，有效融合了宏观轨道数据与微观巡视器数据，并利用联合优化损失函数，提升了月面几何重建精度与语义一致性，生成了兼具高保真度与可通行性语义信息的一体化环境仿真模型。
+
+3. 针对小样本条件下的月面实时环境感知难题，提出了 SiaT-Hough 轻量级岩石感知算法。该算法融合孪生 Transformer 的小样本学习能力与 Hough 变换的几何先验引导，在有限计算资源下实现了对月面岩石的高精度、高鲁棒性实时分割，并通过语义 SLAM 实现了动态环境的持续理解与地图更新。
+
+4. 针对不确定环境中的动态路径规划难题，设计了 A*-D3QN-Opt 分层协同规划框架。该框架将改进 A*算法的全局最优性、改进 D3QN 算法对动态环境的适应性，以及数字孪生虚拟空间的前瞻风险推演能力相融合，通过设计多目标奖励函数与优化学习机制，可生成兼顾安全、效率与能耗的最优行驶路径。
+
+通过构建跨尺度月面重建基准数据集，并开展算法的定量评估、消融实验与下游任务增益验证，验证了所提技术的先进性。实验表明，本文方法将几何重建误差（RMSE）降至厘米级，跨尺度语义一致性达95\%以上，为下一步验证数字孪生技术体系对月球车提升自主行走系统整体性能提供了环境支撑。
+
+综上，本文通过理论、算法与系统的创新，为构建一套完整的月面巡视器自主行走数字孪生解决方案提供支撑，为我国月球探测任务中的巡视器高可靠、长周期自主运行提供重要的理论和技术保障。
+
+\vspace{0.5\baselineskip}
+
+\noindent\heiti\zihao{-4}\textbf{关键词：}\songti\zihao{-4} 月面巡视器；自主行走；数字孪生；跨尺度重建；语义感知；路径规划
+
+% 继续使用摘要页样式
+\thispagestyle{frontpage}
+
+\newpage
+\thispagestyle{frontpage}
+
+% ==================== 英文摘要 ====================
+% 英文摘要页：继续使用大写罗马数字页码，显示在页脚
+\thispagestyle{frontpage}
+
+\newpage
+\thispagestyle{frontpage}
+
+\label{chapter:abstract-en}
+
+% 添加到目录（在标题之前）
+\addcontentsline{toc}{chapter}{Abstract}
+
+% 标题：Arial小二号加粗居中
+\begin{center}
+\arial\bfseries\zihao{-2} Abstract
+\end{center}
+
+\vspace{0.5\baselineskip}
+
+% 正文：Times New Roman小四号，行距固定值20磅
+\rmfamily\zihao{-4}
+\setstretch{1.0}
+\linespread{1.5}\selectfont
+\setlength{\parindent}{2em}
+
+Lunar exploration is advancing into a new stage focused on the construction of scientific research stations and multi-agent collaboration, presenting severe challenges for lunar rovers in achieving long-distance, highly autonomous traversal. The traditional operational paradigm based on "ground teleoperation and static maps" suffers from inherent limitations such as perceptual latency, inflexible planning, and sluggish response when dealing with the complex, uncertain, and unstructured lunar environment, failing to meet the demands for real-time autonomy. Digital Twin technology, by constructing a parallel system characterized by deep virtual-real integration and bidirectional real-time interaction, provides a crucial pathway for transforming rover operation from "remote control" to "autonomous guidance." However, existing digital twin applications in aerospace primarily emphasize status monitoring and post-event analysis. In transitioning from a "static mirror" to "dynamic guidance," they face core bottlenecks including low accuracy in cross-scale environmental modeling, unreliable real-time perception under extreme conditions, and difficulties in coordinating global and local planning within dynamic, uncertain environments. In light of this, this paper systematically investigates digital twin technologies for autonomous lunar rover navigation, aiming to establish a closed-loop enabling system that covers the complete "perception-understanding-decision-verification" pipeline. The main contributions are as follows:
+
+\textbf{1. An enhanced five-dimensional digital twin model and the EDT-FARM system architecture for autonomous navigation are proposed.} Building upon the classical model, this theoretical framework significantly strengthens the real-time predictive capability of virtual entities, the online decision-support function of the service layer, and the closed-loop flow of twin data. A corresponding hierarchical system implementation architecture is designed, providing a unified theoretical foundation and integrated framework for subsequent key technology research.
+
+\textbf{2. An Adaptive-scale Geometric-Semantic Fusion Reconstruction (AdaScale-GSFR) algorithm is proposed to address the challenge of cross-scale environmental modeling.} By introducing an Adaptive Scale Attention (ASA) mechanism, this algorithm effectively fuses macro-scale orbital data with micro-scale rover data. Utilizing a joint optimization loss function, it synchronously enhances geometric reconstruction accuracy and semantic consistency, generating a unified environmental model that combines high fidelity with traversability semantic information.
+
+\textbf{3. A lightweight SiaT-Hough rock perception algorithm is proposed to overcome the bottleneck of real-time perception under extreme lighting and small-sample conditions.} This algorithm integrates the few-shot learning capability of a Siamese Transformer with the geometric prior guidance of Hough Transform. It achieves high-precision, highly robust real-time segmentation of lunar rocks under constrained computational resources and enables continuous understanding of the dynamic environment and map updates through semantic SLAM.
+
+\textbf{4. An A*-D3QN-Opt hierarchical collaborative planning framework is designed to tackle the challenge of dynamic path planning in uncertain environments.} This framework integrates the global optimality of an improved A* algorithm, the adaptability of an improved D3QN algorithm to dynamic environments, and the prospective risk prediction capability of the digital twin virtual space. By designing a multi-objective reward function and an optimized learning mechanism, it generates optimal traversal paths that balance safety, efficiency, and energy consumption.
+
+Finally, the advancement of the proposed technologies is comprehensively demonstrated through the construction of a cross-scale lunar reconstruction benchmark dataset and the execution of systematic quantitative evaluation, ablation studies, and downstream task gain verification. Experimental results indicate that our methods reduce the geometric reconstruction error (RMSE) to centimeter-level, achieve cross-scale semantic consistency above 95\%, and significantly improve downstream rock detection rate (+15\%) and path planning safety score (+22\%), validating the core value of the digital twin technology system in enhancing the overall performance of the autonomous navigation system.
+
+In conclusion, through comprehensive innovation in theory, algorithms, and system integration, this paper constructs a complete digital twin solution for autonomous lunar rover navigation. It provides important theoretical underpinnings and technical support for the highly reliable, long-term autonomous operation of rovers in China's future deep lunar exploration missions.
+
+\vspace{0.5\baselineskip}
+
+\noindent\textbf{Keywords:} Lunar Rover; Autonomous Navigation; Digital Twin; Cross-Scale Reconstruction; Semantic Perception; Path Planning
+
+% 保持大写罗马数字页码，目录页继续顺延
+% （正文部分在 main.tex 中使用 \mainmatter 后会自动切换为阿拉伯数字）
+\thispagestyle{frontpage}
+
+\newpage

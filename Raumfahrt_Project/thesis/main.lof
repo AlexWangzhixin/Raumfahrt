@@ -1,0 +1,25 @@
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {1-1}{\ignorespaces 论文技术路线图}}{7}{figure.caption.1}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {2-1}{\ignorespaces 经典数字孪生五维模型}}{9}{figure.caption.2}%
+\contentsline {figure}{\numberline {2-2}{\ignorespaces 月面巡视器自主行走数字孪生总体架构}}{15}{figure.caption.3}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3-1}{\ignorespaces 实验区域三维地形模型}}{26}{figure.caption.6}%
+\contentsline {figure}{\numberline {3-2}{\ignorespaces 温度模型预测与观测数据对比}}{26}{figure.caption.8}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4-1}{\ignorespaces 巡视器拓扑结构示意图}}{31}{figure.caption.9}%
+\contentsline {figure}{\numberline {4-2}{\ignorespaces 动力学数字孪生仿真系统架构}}{33}{figure.caption.10}%
+\contentsline {figure}{\numberline {4-3}{\ignorespaces 场景C巡视器运动轨迹}}{35}{figure.caption.13}%
+\contentsline {figure}{\numberline {4-4}{\ignorespaces 场景B巡视器速度变化曲线}}{35}{figure.caption.14}%
+\contentsline {figure}{\numberline {4-5}{\ignorespaces 车轮沉陷深度变化}}{35}{figure.caption.15}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5-1}{\ignorespaces 数字孪生平台岩石识别框架}}{38}{figure.caption.16}%
+\contentsline {figure}{\numberline {5-2}{\ignorespaces 岩石定位误差累积分布}}{45}{figure.caption.18}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {6-1}{\ignorespaces 数字孪生路径规划框架}}{49}{figure.caption.22}%
+\contentsline {figure}{\numberline {6-2}{\ignorespaces A-D3QN网络结构}}{53}{figure.caption.23}%
+\contentsline {figure}{\numberline {6-3}{\ignorespaces 训练收敛曲线}}{57}{figure.caption.26}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsfinish 
+\contentsfinish 

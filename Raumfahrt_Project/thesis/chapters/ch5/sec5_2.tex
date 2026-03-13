@@ -1,0 +1,93 @@
+% ==================== 5.2 数字孪生平台下的岩石识别框架 ====================
+\section{数字孪生平台下的岩石识别框架}
+\label{sec:rock_framework}
+
+在数字孪生框架下，岩石识别系统可以利用虚拟空间中的计算资源，实现更复杂、更准确的识别算法。本节构建数字孪生平台下的岩石识别框架。
+
+\subsection{框架总体设计}
+\label{subsec:framework_design}
+
+数字孪生平台下的岩石识别框架如图\ref{fig:rock_framework}所示，包括物理感知层、数据传输层、虚拟处理层和决策应用层四个层次。
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        scale=0.75,
+        transform shape,
+        layer/.style={rectangle, draw, fill=#1, text width=11cm, text centered, minimum height=1.2cm}
+    ]
+        \node[layer=red!15] (app) at (0, 4.5) {\textbf{决策应用层}：避障决策、路径重规划、运动控制};
+        \node[layer=orange!20] (virt) at (0, 3) {\textbf{虚拟处理层}：图像处理、目标检测、三维重建、定位};
+        \node[layer=blue!15] (trans) at (0, 1.5) {\textbf{数据传输层}：数据压缩、传输协议、时延补偿};
+        \node[layer=green!15] (phys) at (0, 0) {\textbf{物理感知层}：导航相机、避障相机、激光测距};
+        
+        \draw[->, thick] (phys) -- (trans);
+        \draw[->, thick] (trans) -- (virt);
+        \draw[->, thick] (virt) -- (app);
+    \end{tikzpicture}
+    \caption{数字孪生平台岩石识别框架}
+    \label{fig:rock_framework}
+\end{figure}
+
+\textbf{（1）物理感知层}
+
+物理感知层部署在巡视器上，负责获取环境图像数据。主要传感器包括：
+\begin{itemize}
+    \item 导航相机：双目立体相机，用于远距离环境感知；
+    \item 避障相机：大视场相机，用于近距离障碍检测；
+    \item 激光测距仪：用于精确距离测量。
+\end{itemize}
+
+\textbf{（2）数据传输层}
+
+数据传输层负责将图像数据从巡视器传输到地面数字孪生平台。主要功能包括：
+\begin{itemize}
+    \item 数据压缩：采用JPEG2000或H.264压缩算法，降低传输带宽需求；
+    \item 传输协议：采用空间通信协议，确保数据可靠传输；
+    \item 时延补偿：对传输时延进行记录和补偿。
+\end{itemize}
+
+\textbf{（3）虚拟处理层}
+
+虚拟处理层部署在地面数字孪生平台，利用强大的计算资源进行岩石识别处理。主要功能包括：
+\begin{itemize}
+    \item 图像预处理：去噪、增强、校正；
+    \item 目标检测：基于深度学习的岩石检测；
+    \item 三维重建：从图像恢复岩石的三维信息；
+    \item 精确定位：结合SLAM系统确定岩石在地图中的位置。
+\end{itemize}
+
+\textbf{（4）决策应用层}
+
+决策应用层根据识别结果进行避障决策。主要功能包括：
+\begin{itemize}
+    \item 避障决策：判断是否需要避障，选择避障策略；
+    \item 路径重规划：根据新的障碍信息更新路径；
+    \item 运动控制：生成避障控制指令。
+\end{itemize}
+
+\subsection{数据流设计}
+\label{subsec:data_flow}
+
+岩石识别的数据流设计如下：
+
+\begin{enumerate}
+    \item 巡视器相机获取环境图像；
+    \item 图像数据压缩后传输到地面；
+    \item 地面数字孪生平台接收图像并解压；
+    \item 图像预处理（去噪、增强、校正）；
+    \item 岩石目标检测（深度学习算法）；
+    \item 三维重建与定位（SLAM系统）；
+    \item 更新环境地图（岩石位置和尺寸）；
+    \item 避障决策与路径规划；
+    \item 控制指令传输到巡视器；
+    \item 巡视器执行避障动作。
+\end{enumerate}
+
+该框架的优势在于：
+\begin{itemize}
+    \item 利用地面计算资源，可运行复杂的深度学习算法；
+    \item 虚拟空间与物理空间分离，降低巡视器计算负担；
+    \item 支持多源数据融合，提高识别精度；
+    \item 可与数字孪生环境模型协同，提高定位准确性。
+\end{itemize}

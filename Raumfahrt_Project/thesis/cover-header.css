@@ -1,0 +1,147 @@
+/* ==================== 封面顶部信息栏 CSS 样式 ==================== */
+/* 设计目标：实现文字与下划线严格水平对齐，左右列文字宽度统一 */
+
+/* 容器样式 - 使用flex布局实现两端对齐 */
+.cover-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    width: 100%;
+    padding: 20px 15px;
+    font-size: 14px;
+    line-height: 1.5;
+    box-sizing: border-box;
+}
+
+/* 左列容器 - 学号和中图分类号 */
+.header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 55%;
+}
+
+/* 右列容器 - 学校代码和密级 */
+.header-right {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 40%;
+}
+
+/* 信息项通用样式 */
+.info-item {
+    display: flex;
+    align-items: baseline;
+    white-space: nowrap;
+}
+
+/* 标签样式 - 固定宽度实现左对齐 */
+.label-left {
+    display: inline-block;
+    width: 6ch;  /* 学号/中图分类号 统一宽度 */
+    text-align: justify;
+    text-align-last: justify;
+    margin-right: 8px;
+}
+
+/* 右侧标签样式 - 固定宽度实现右对齐 */
+.label-right {
+    display: inline-block;
+    width: 5ch;  /* 学校代码/密级 统一宽度 */
+    text-align: justify;
+    text-align-last: justify;
+    margin-right: 8px;
+}
+
+/* 下划线样式 - 使用伪元素精确控制 */
+.underline {
+    position: relative;
+    display: inline-block;
+    min-width: 120px;
+    padding-bottom: 2px;
+    text-align: center;
+}
+
+/* 下划线伪元素 - 与文字基线对齐 */
+.underline::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background-color: #000;
+}
+
+/* 特定下划线长度 */
+.underline-student-id { min-width: 140px; }
+.underline-school-code { min-width: 80px; }
+.underline-classification { min-width: 100px; }
+.underline-secret { min-width: 80px; }
+
+/* ==================== 响应式设计 ==================== */
+
+/* 平板设备 */
+@media screen and (max-width: 768px) {
+    .cover-header {
+        padding: 15px 10px;
+        font-size: 13px;
+    }
+    
+    .header-left {
+        width: 52%;
+    }
+    
+    .header-right {
+        width: 43%;
+    }
+    
+    .label-left {
+        width: 5.5ch;
+    }
+    
+    .label-right {
+        width: 4.5ch;
+    }
+    
+    .underline {
+        min-width: 100px;
+    }
+}
+
+/* 手机设备 */
+@media screen and (max-width: 480px) {
+    .cover-header {
+        flex-direction: column;
+        padding: 10px;
+        font-size: 12px;
+    }
+    
+    .header-left,
+    .header-right {
+        width: 100%;
+    }
+    
+    .info-item {
+        justify-content: flex-start;
+    }
+    
+    .underline {
+        flex: 1;
+        min-width: auto;
+    }
+}
+
+/* ==================== 打印样式 ==================== */
+@media print {
+    .cover-header {
+        padding: 20px 15px;
+        font-size: 14pt;
+    }
+    
+    .underline::after {
+        background-color: #000;
+        height: 0.5pt;
+    }
+}

@@ -1,0 +1,122 @@
+% ==================== 5.3 增强型ORB-SLAM2系统 ====================
+\section{增强型ORB-SLAM2系统}
+\label{sec:enhanced_orbslam}
+
+ORB-SLAM2是一种高性能的视觉SLAM系统，广泛应用于机器人导航和自动驾驶领域。针对月面环境的特殊性，本节提出增强型ORB-SLAM2系统，实现月面岩石的精确识别与定位。
+
+\subsection{ORB-SLAM2基础框架}
+\label{subsec:orb_base}
+
+ORB-SLAM2系统\cite{ref29}由四个主要模块组成：跟踪（Tracking）、局部建图（Local Mapping）、回环检测（Loop Closing）和可视化（Visualization）。
+
+\textbf{（1）跟踪模块}
+
+跟踪模块负责处理输入图像，提取ORB特征点，与地图中的特征点进行匹配，估计相机位姿。主要步骤包括：
+\begin{itemize}
+    \item 特征提取：提取ORB（Oriented FAST and Rotated BRIEF）特征点；
+    \item 特征匹配：与前一帧或关键帧进行特征匹配；
+    \item 位姿估计：基于匹配结果估计相机位姿；
+    \item 跟踪状态判断：判断跟踪是否丢失。
+\end{itemize}
+
+\textbf{（2）局部建图模块}
+
+局部建图模块负责维护局部地图，包括关键帧管理和地图点管理。主要功能包括：
+\begin{itemize}
+    \item 关键帧插入：判断是否插入新的关键帧；
+    \item 地图点剔除：剔除不可靠的地图点；
+    \item 局部光束法平差：优化局部地图。
+\end{itemize}
+
+\textbf{（3）回环检测模块}
+
+回环检测模块负责检测巡视器是否回到之前访问过的位置，消除累积误差。采用词袋模型（Bag of Words）进行场景识别。
+
+\textbf{（4）可视化模块}
+
+可视化模块负责实时显示跟踪结果和地图。
+
+\subsection{针对月面环境的增强设计}
+\label{subsec:lunar_enhancement}
+
+针对月面环境的特殊性，对ORB-SLAM2进行以下增强：
+
+\textbf{（1）光照自适应特征提取}
+
+月面光照条件变化剧烈，需要增强特征提取的鲁棒性。采用自适应阈值方法：
+\begin{equation}
+    \theta_{adaptive} = \theta_{base} + k \cdot \sigma_{image}
+    \label{eq:adaptive_threshold}
+\end{equation}
+其中，$\theta_{base}$为基础阈值，$\sigma_{image}$为图像标准差，$k$为调节系数。
+
+同时引入多尺度特征提取，在金字塔不同层级提取特征，增强对光照变化的适应性。
+
+\textbf{（2）岩石目标检测集成}
+
+在ORB-SLAM2基础上集成岩石目标检测模块。采用Faster R-CNN\cite{ref49}或YOLO\cite{ref50}等目标检测算法，在图像中检测岩石目标。
+
+检测流程：
+\begin{enumerate}
+    \item 输入图像进行目标检测；
+    \item 获取岩石目标的边界框（Bounding Box）；
+    \item 提取边界框内的特征点；
+    \item 通过三角化或深度估计获取岩石的三维位置；
+    \item 将岩石标记添加到地图中。
+\end{enumerate}
+
+\textbf{（3）月面地形约束}
+
+利用数字孪生中的地形模型，为SLAM系统提供地形约束。当地形模型已知时，可以将地图点约束在地形表面上：
+\begin{equation}
+    z_{point} = h_{terrain}(x_{point}, y_{point})
+    \label{eq:terrain_constraint}
+\end{equation}
+
+该约束可以减少状态估计的自由度，提高定位精度。
+
+\textbf{（4）月尘干扰抑制}
+
+月尘干扰会导致图像质量下降。采用以下方法抑制月尘干扰：
+\begin{itemize}
+    \item 图像增强：采用直方图均衡化、Retinex等方法增强图像；
+    \item 镜头标定：定期进行镜头月尘检测和标定；
+    \item 多帧融合：利用多帧图像融合降低噪声影响。
+\end{itemize}
+
+\subsection{岩石三维重建}
+\label{subsec:rock_reconstruction}
+
+基于增强型ORB-SLAM2系统，实现岩石的三维重建。主要步骤如下：
+
+\textbf{（1）岩石检测}
+
+利用目标检测算法检测图像中的岩石目标，获取边界框。
+
+\textbf{（2）特征点提取}
+
+在岩石边界框内提取特征点，这些特征点属于岩石目标。
+
+\textbf{（3）特征匹配与三角化}
+
+对相邻帧或关键帧中的岩石特征点进行匹配，通过三角化计算特征点的三维坐标。
+
+三角化公式：
+\begin{equation}
+    \mathbf{P}_1 \mathbf{X} = \lambda_1 \mathbf{x}_1, \quad \mathbf{P}_2 \mathbf{X} = \lambda_2 \mathbf{x}_2
+    \label{eq:triangulation}
+\end{equation}
+其中，$\mathbf{P}_1$, $\mathbf{P}_2$为相机投影矩阵，$\mathbf{X}$为三维点坐标，$\mathbf{x}_1$, $\mathbf{x}_2$为图像点坐标。
+
+\textbf{（4）岩石尺寸估计}
+
+根据岩石边界框和三维点坐标，估计岩石的尺寸。主要方法包括：
+\begin{itemize}
+    \item 包围盒法：计算岩石特征点的最小包围盒；
+    \item 点云聚类：对岩石点云进行聚类，估计尺寸；
+    \item 深度学习法：直接从图像估计岩石尺寸。
+\end{itemize}
+
+\textbf{（5）岩石地图构建}
+
+将岩石的位置、尺寸信息添加到环境地图中，形成岩石障碍地图，为路径规划提供依据。

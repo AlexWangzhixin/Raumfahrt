@@ -1,0 +1,98 @@
+% ==================== 3.4 月面光照与温度环境建模 ====================
+\section{月面光照与温度环境建模}
+\label{sec:light_temp}
+
+月面光照与温度环境是影响巡视器能源供给和热控设计的关键因素。本节从太阳运动规律、光照场建模、温度场建模三个方面展开研究。
+
+\subsection{太阳运动规律分析}
+\label{subsec:sun_motion}
+
+月球绕地球公转的同时自转，形成独特的太阳视运动规律。
+
+\textbf{（1）太阳高度角}
+
+太阳高度角定义为太阳光线与当地水平面的夹角，计算公式为：
+\begin{equation}
+    \sin h = \sin\phi\sin\delta + \cos\phi\cos\delta\cos\omega
+    \label{eq:sun_altitude}
+\end{equation}
+其中，$\phi$为纬度，$\delta$为太阳赤纬，$\omega$为时角。
+
+对于月球，太阳赤纬变化范围为$\pm 1.5\degree$（黄白交角），时角周期为月球自转周期（约27.3天）。
+
+\textbf{（2）太阳方位角}
+
+太阳方位角定义为太阳光线在水平面上的投影与正北方向的夹角：
+\begin{equation}
+    \cos A = \frac{\sin h \sin\phi - \sin\delta}{\cos h \cos\phi}
+    \label{eq:sun_azimuth}
+\end{equation}
+
+\textbf{（3）月昼月夜周期}
+
+月球自转周期约为27.3天，因此月昼和月夜各约13.65天。在极区，由于太阳高度角常年较低，存在持续光照区和永久阴影区。
+
+\subsection{光照场建模}
+\label{subsec:illumination}
+
+光照场建模的目标是计算月面任意位置、任意时刻的太阳辐照度和阴影分布。
+
+\textbf{（1）太阳辐照度计算}
+
+月面接收的太阳辐照度取决于太阳高度角和地形遮挡。太阳辐照度可表示为：
+\begin{equation}
+    I = I_0 \cdot \sin h \cdot (1 - S)
+    \label{eq:irradiance}
+\end{equation}
+其中，$I_0$为太阳常数（约1361 W/m²），$S$为阴影因子（被遮挡时$S=1$，否则$S=0$）。
+
+\textbf{（2）阴影计算}
+
+采用光线追踪方法计算阴影分布。对于月面上任意点$P$，沿太阳光线方向追踪，若遇到地形障碍则$P$处于阴影中。
+
+阴影判断的条件为：
+\begin{equation}
+    h_{obs} \geq h_P + d_{obs-P} \cdot \tan h
+    \label{eq:shadow}
+\end{equation}
+其中，$h_{obs}$为障碍物高程，$h_P$为点$P$的高程，$d_{obs-P}$为障碍物到点$P$的距离，$h$为太阳高度角。
+
+\textbf{（3）光照时序分析}
+
+对于规划区域，分析各点的光照时间分布，识别长时间处于阴影或光照的区域，为巡视器能源规划提供依据。
+
+\subsection{温度场建模}
+\label{subsec:temperature}
+
+温度场建模的目标是计算月面任意位置、任意时刻的温度分布。
+
+\textbf{（1）热平衡方程}
+
+月面温度由热平衡方程确定：
+\begin{equation}
+    \frac{\partial T}{\partial t} = \frac{1}{\rho c_p}\frac{\partial}{\partial z}\left(k\frac{\partial T}{\partial z}\right) + \frac{Q}{\rho c_p}
+    \label{eq:heat_eq}
+\end{equation}
+其中，$T$为温度，$\rho$为密度，$c_p$为比热容，$k$为热导率，$Q$为热源项（太阳辐射）。
+
+\textbf{（2）边界条件}
+
+表面边界条件：
+\begin{equation}
+    -k\left.\frac{\partial T}{\partial z}\right|_{z=0} = \alpha I - \epsilon\sigma T^4
+    \label{eq:surface_bc}
+\end{equation}
+其中，$\alpha$为吸收率（约0.9），$\epsilon$为发射率（约0.9），$\sigma$为Stefan-Boltzmann常数（$5.67\times 10^{-8}$ W/m²/K⁴）。
+
+深层边界条件：
+\begin{equation}
+    T|_{z\to\infty} = T_{deep}
+    \label{eq:deep_bc}
+\end{equation}
+其中，$T_{deep}$为深层温度（约250 K）。
+
+\textbf{（3）数值求解}
+
+采用有限差分方法求解热平衡方程。将月壤沿深度方向离散为多层，时间采用显式或隐式格式推进。
+
+月面温度典型值为：白天最高约390 K（117\degree C），夜间最低约100 K（-173\degree C），平均约220 K（-53\degree C）。

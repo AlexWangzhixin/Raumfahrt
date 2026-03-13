@@ -1,0 +1,113 @@
+% ==================== 4.2 轮-壤交互力学理论 ====================
+\section{轮-壤交互力学理论}
+\label{sec:wheel_soil}
+
+轮-壤交互力学是巡视器动力学建模的核心。本节在经典地面力学理论基础上，针对月面环境的特殊性，建立考虑滑移特性的轮-壤相互作用模型。
+
+\subsection{经典地面力学理论回顾}
+\label{subsec:classical_terra}
+
+经典地面力学理论以Bekker\cite{ref11}的工作为基础，Wong\cite{ref18}对其进行了系统发展。该理论主要解决两个问题：车轮沉陷和牵引力预测。
+
+\textbf{（1）沉陷模型}
+
+车轮在软土地面上的沉陷由两部分组成：静态沉陷和动态沉陷。静态沉陷由垂直载荷引起，沉陷深度$z$与垂直载荷$W$的关系为：
+\begin{equation}
+    W = (bD)\left(\frac{k_c}{b} + k_\phi\right)\left(\frac{z}{D}\right)^n
+    \label{eq:sinkage}
+\end{equation}
+其中，$b$为车轮宽度，$D$为车轮直径，$k_c$为内聚模量，$k_\phi$为摩擦模量，$n$为沉陷指数。
+
+\textbf{（2）牵引力模型}
+
+车轮产生的牵引力由接触区域的剪切应力决定。剪切应力$\tau$与剪切位移$j$的关系可用Janosi-Hanamoto公式描述：
+\begin{equation}
+    \tau = (c + \sigma\tan\phi)\left(1 - e^{-j/K}\right)
+    \label{eq:shear}
+\end{equation}
+其中，$c$为内聚力，$\phi$为内摩擦角，$\sigma$为法向应力，$K$为剪切模量。
+
+\subsection{考虑滑移的轮-壤相互作用模型}
+\label{subsec:slip_model}
+
+月面环境下，车轮滑移现象显著，需要建立考虑滑移特性的轮-壤相互作用模型。
+
+\textbf{（1）滑移率定义}
+
+滑移率$i$定义为车轮理论速度与实际速度之差与理论速度的比值：
+\begin{equation}
+    i = 1 - \frac{v}{r\omega}
+    \label{eq:slip_ratio}
+\end{equation}
+其中，$v$为车轮中心实际速度，$r$为车轮半径，$\omega$为车轮角速度。
+
+\textbf{（2）滑移沉陷}
+
+车轮滑移会加剧沉陷，称为滑移沉陷。滑移沉陷深度$z_s$与滑移率$i$的关系可表示为：
+\begin{equation}
+    z_s = z_0(1 + a_s \cdot i^b)
+    \label{eq:slip_sinkage}
+\end{equation}
+其中，$z_0$为静态沉陷深度，$a_s$和$b$为经验系数。
+
+\textbf{（3）牵引力计算}
+
+考虑滑移的车轮牵引力$F_t$可通过对接触区域剪切应力积分得到：
+\begin{equation}
+    F_t = \int_A \tau \, dA = \int_{\theta_1}^{\theta_2} (c + \sigma\sin\theta\tan\phi)\left(1 - e^{-j(\theta)/K}\right) r b \, d\theta
+    \label{eq:traction}
+\end{equation}
+其中，$\theta_1$和$\theta_2$分别为车轮进入角和离开角，$j(\theta)$为剪切位移分布。
+
+\textbf{（4）运动阻力}
+
+车轮运动阻力$R$由压实阻力和推土阻力组成：
+\begin{equation}
+    R = R_c + R_b
+    \label{eq:resistance}
+\end{equation}
+
+压实阻力：
+\begin{equation}
+    R_c = b\int_0^z \sigma \, dz
+    \label{eq:compact_res}
+\end{equation}
+
+推土阻力：
+\begin{equation}
+    R_b = b\left(c z \cot\theta + 0.5 \gamma z^2 \cot\theta\right)
+    \label{eq:bulldozing_res}
+\end{equation}
+其中，$\gamma$为土壤容重，$\theta$为破坏面倾角。
+
+\subsection{低重力环境修正}
+\label{subsec:low_gravity}
+
+月球低重力环境对轮-壤相互作用产生显著影响，需要对经典模型进行修正。
+
+\textbf{（1）重力效应修正}
+
+低重力环境下，车轮接地压力减小，沉陷深度增加。修正后的沉陷方程为：
+\begin{equation}
+    z_{moon} = z_{earth} \cdot \left(\frac{g_{earth}}{g_{moon}}\right)^\alpha
+    \label{eq:gravity_sinkage}
+\end{equation}
+其中，$\alpha$为修正系数，通常取0.5-1.0。
+
+\textbf{（2）牵引能力修正}
+
+低重力环境下，土壤的有效内聚力不变，但重力分量减小，导致牵引能力下降。修正后的牵引力：
+\begin{equation}
+    F_{t,moon} = F_{t,earth} \cdot \frac{g_{moon}}{g_{earth}} + F_c
+    \label{eq:gravity_traction}
+\end{equation}
+其中，$F_c$为内聚力贡献项。
+
+\textbf{（3）稳定性修正}
+
+低重力环境下，巡视器的姿态稳定性下降，需要降低坡度通行限制。临界坡度$\theta_{max}$修正为：
+\begin{equation}
+    \theta_{max,moon} = \theta_{max,earth} - \Delta\theta_g
+    \label{eq:gravity_stability}
+\end{equation}
+其中，$\Delta\theta_g$为重力修正量，通常取3-5\degree。
